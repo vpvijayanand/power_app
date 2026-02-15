@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Algo Trading Platform{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">Client Dashboard</h1>
+        <p class="text-muted">Welcome back, {{ user.name }}!</p>
+    </div>
+
+    <!-- Account Statistics -->
+    <div class="dashboard-stats">
+        <!-- Account Balance -->
+        <div class="stat-card">
+            <div class="stat-label">Account Balance</div>
+            <div class="stat-value blue">₹{{ "%.2f"|format(user.kite_account_balance|float) }}</div>
+            {% if user.last_balance_update %}
+            <small class="text-muted">Updated: {{ user.last_balance_update.strftime('%Y-%m-%d %H:%M') }}</small>
+            {% else %}
+            <small class="text-muted">Not updated yet</small>
+            {% endif %}
+        </div>
+
+        <!-- Growth Percentage -->
+        <div class="stat-card">
+            <div class="stat-label">Account Growth</div>
+            <div class="stat-value {{ growth_color }}">
+                {{ "%.2f"|format(user.account_growth_percentage|float) }}%
+            </div>
+            <small class="text-muted">Since inception</small>
+        </div>
+
+        <!-- Trade Mode -->
+        <div class="stat-card">
+            <div class="stat-label">Trade Mode</div>
+            <div class="stat-value">
+                {% if user.trade_mode == 'Live' %}
+                <span class="badge badge-success">{{ user.trade_mode }}</span>
+                {% else %}
+                <span class="badge badge-info">{{ user.trade_mode }}</span>
+                {% endif %}
+            </div>
+            <small class="text-muted">Lot Size: {{ user.lot_size }}</small>
+        </div>
+
+        <!-- Kite Connection -->
+        <div class="stat-card">
+            <div class="stat-label">Kite Status</div>
+            <div class="stat-value">
+                {% if user.request_token %}
+                <span class="badge badge-success">Connected</span>
+                {% else %}
+                <span class="badge badge-danger">Not Connected</span>
+                {% endif %}
+            </div>
+            <div style="margin-top: 0.5rem;">
+                {% if user.api_key %}
+                <a href="{{ url_for('kite.connect') }}" class="btn btn-sm btn-primary">Connect Kite</a>
+                <a href="{{ url_for('kite.refresh_balance') }}" class="btn btn-sm btn-success">Refresh</a>
+                {% else %}
+                <a href="{{ url_for('kite.credentials') }}" class="btn btn-sm btn-primary">Set Credentials</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-2 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Market Trends</h3>
+            </div>
+            <div class="card-body">
+                <div
+                    style="height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                    <p>Chart integration coming soon...</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Live PnL</h3>
+            </div>
+            <div class="card-body">
+                <div
+                    style="height: 300px; display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                    <p>PnL tracking coming soon...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trade History -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Trades</h3>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
+                        <th>Quantity</th>
+                        <th>Entry</th>
+                        <th>Exit</th>
+                        <th>PnL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">No trades yet</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

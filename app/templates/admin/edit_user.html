@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Edit User - Algo Trading Platform{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin-top: 3rem;">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Edit User: {{ user.name }}</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.edit_user', user_id=user.id) }}">
+                <h4 class="text-blue mb-2">User Information</h4>
+
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="name" class="form-control" value="{{ user.name }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ user.email }}" required>
+                    </div>
+                </div>
+
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Mobile</label>
+                        <input type="text" name="mobile" class="form-control" value="{{ user.mobile or '' }}"
+                            placeholder="Optional">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">User Type</label>
+                        <input type="text" class="form-control" value="{{ user.user_type }}" readonly>
+                        <small class="text-muted">User type cannot be changed</small>
+                    </div>
+                </div>
+
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Trade Mode</label>
+                        <select name="trade_mode" class="form-control" required>
+                            <option value="Paper" {% if user.trade_mode=='Paper' %}selected{% endif %}>Paper Trading
+                            </option>
+                            <option value="Live" {% if user.trade_mode=='Live' %}selected{% endif %}>Live Trading
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Lot Size</label>
+                        <input type="number" name="lot_size" class="form-control" value="{{ user.lot_size }}" min="1"
+                            required>
+                    </div>
+                </div>
+
+                <hr style="border-color: var(--border-color); margin: 2rem 0;">
+
+                <h4 class="text-blue mb-2">Kite API Credentials</h4>
+
+                <div class="alert alert-info">
+                    <strong>Note:</strong> Leave fields empty to keep existing credentials. Only fill to update.
+                </div>
+
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">API Key</label>
+                        <input type="text" name="api_key" class="form-control" value="{{ user.api_key or '' }}"
+                            placeholder="Enter new API key or leave empty">
+                        {% if user.api_key %}
+                        <small class="text-green">✓ Currently set</small>
+                        {% else %}
+                        <small class="text-muted">Not set</small>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">API Secret</label>
+                        <input type="password" name="api_secret" class="form-control"
+                            placeholder="Enter new API secret or leave empty">
+                        {% if user.api_secret %}
+                        <small class="text-green">✓ Currently set</small>
+                        {% else %}
+                        <small class="text-muted">Not set</small>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Callback Token (Read-only)</label>
+                    <input type="text" class="form-control" value="{{ user.kite_callback_token }}" readonly>
+                    <small class="text-muted">This unique token is used for Kite callbacks</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Request Token Status</label>
+                    <div>
+                        {% if user.request_token %}
+                        <span class="badge badge-success">Connected</span>
+                        <small class="text-muted">Last updated: {{ user.last_balance_update.strftime('%Y-%m-%d %H:%M')
+                            if user.last_balance_update else 'Never' }}</small>
+                        {% else %}
+                        <span class="badge badge-danger">Not Connected</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <hr style="border-color: var(--border-color); margin: 2rem 0;">
+
+                <div class="grid grid-3" style="margin-top: 1.5rem;">
+                    <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Update User</button>
+                    <form method="POST" action="{{ url_for('admin.delete_user', user_id=user.id) }}"
+                        onsubmit="return confirm('Are you sure you want to delete this user? This action cannot be undone!');"
+                        style="display: inline;">
+                        <button type="submit" class="btn btn-danger" style="width: 100%;">Delete User</button>
+                    </form>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

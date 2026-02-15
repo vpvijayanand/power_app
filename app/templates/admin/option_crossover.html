@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Cross Over Analysis - Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 2rem; max-width: 1600px;">
+    <!-- Header -->
+    <div class="flex-row items-center justify-between mb-4">
+        <div>
+            <h2 class="text-2xl font-bold">Cross Over Analysis</h2>
+            <p class="text-muted">OI vs Price Trend Analysis</p>
+        </div>
+        <div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline mr-2">← Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Spot Price -->
+    <div class="card mb-4 bg-gray-800 border-gray-700">
+        <div class="card-body flex-row items-center justify-between">
+            <div>
+                <h3 class="text-xl font-bold text-white">Current Spot: <span class="text-primary">{{
+                        "%.2f"|format(current_spot) }}</span></h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('admin.option_crossover') }}" class="grid grid-5 gap-4 items-end">
+                <!-- Underlying -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Underlying</label>
+                    <select name="underlying" class="form-control form-control-sm" onchange="this.form.submit()">
+                        {% for u in underlyings %}
+                        <option value="{{ u }}" {% if filters.underlying==u %}selected{% endif %}>{{ u }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Expiry -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Expiry Date</label>
+                    <select name="expiry" class="form-control form-control-sm" onchange="this.form.submit()">
+                        {% for e in expiries %}
+                        <option value="{{ e }}" {% if filters.expiry==e|string %}selected{% endif %}>{{
+                            e.strftime('%Y-%m-%d') }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Date -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Date</label>
+                    <input type="date" name="date" class="form-control form-control-sm" value="{{ filters.date }}"
+                        onchange="this.form.submit()">
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card" style="background-color: #000000;">
+        <div class="card-body p-2">
+            <canvas id="crossoverChart" height="500"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const rawData = [
+            {% for row in chart_data %}
+            {
+            time: "{{ row.time }}",
+            ce_oi: {{ row.ce_oi }},
+        pe_oi: {{ row.pe_oi }},
+        ce_change: {{ row.ce_change }},
+        pe_change: {{ row.pe_change }},
+        nifty_change: {{ row.nifty_change }}
+            },
+        {% endfor %}
+        ];
+
+    const labels = rawData.map(d => d.time);
+
+    const ctx = document.getElementById('crossoverChart').getContext('2d');
+
+    // Chart Config
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                // Total OI (Light Colors, Thin)
+                {
+                    label: 'CE OI Total',
+                    data: rawData.map(d => d.ce_oi),
+                    borderColor: '#ff6666', // Light Red
+                    backgroundColor: '#ff6666',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    yAxisID: 'y_oi',
+                    tension: 0.1
+                },
+                {
+                    label: 'PE OI Total',
+                    data: rawData.map(d => d.pe_oi),
+                    borderColor: '#66ff66', // Light Green
+                    backgroundColor: '#66ff66',
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    yAxisID: 'y_oi',
+                    tension: 0.1
+                },
+
+                // OI Change (Dark Colors, Thick)
+                {
+                    label: 'CE OI Change',
+                    data: rawData.map(d => d.ce_change),
+                    borderColor: '#cc0000', // Dark Red
+                    backgroundColor: '#cc0000',
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    yAxisID: 'y_change', // Separate axis for change? Or share with OI?
+                    // OI Total is Millions, Change is Thousands. Need Separate Axis or same?
+                    // If same, Change will be flat line. 
+                    // User prompt imply they are comparable or visible together. 
+                    // "shows ... how OI has changed for CE and PE sum ... also it must have CE OI_change ... thicker"
+                    // Usually traders view Change on separate scale or separate chart.
+                    // I'll put Change on a 3rd axis or share with Nifty? No.
+                    // I'll put OI Change on 'y_change' axis on RIGHT.
+                    tension: 0.1
+                },
+                {
+                    label: 'PE OI Change',
+                    data: rawData.map(d => d.pe_change),
+                    borderColor: '#00cc00', // Dark Green
+                    backgroundColor: '#00cc00',
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    yAxisID: 'y_change',
+                    tension: 0.1
+                },
+
+                // Nifty Price Change (Blue)
+                {
+                    label: 'Nifty Change (1m)',
+                    data: rawData.map(d => d.nifty_change),
+                    borderColor: '#3399ff', // Blue
+                    backgroundColor: '#3399ff',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    yAxisID: 'y_price', // 3rd Axis?
+                    tension: 0.1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: { color: '#ffffff' }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(50, 50, 50, 0.9)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff'
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#ffffff' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' } // Thin white grid
+                },
+                y_oi: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    ticks: { color: '#ff6666' },
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                    title: { display: true, text: 'Total OI', color: '#ffffff' }
+                },
+                y_change: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { display: false },
+                    ticks: { color: '#cc0000' },
+                    title: { display: true, text: 'OI Change', color: '#ffffff' }
+                },
+                y_price: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { display: false },
+                    ticks: { color: '#3399ff' },
+                    title: { display: true, text: 'Price Change', color: '#ffffff' }
+                }
+            }
+        }
+    });
+    });
+</script>
+{% endblock %}

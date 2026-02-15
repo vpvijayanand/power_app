@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block title %}Index Analysis - Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 2rem; max-width: 1600px;">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+            <h2 class="text-2xl font-bold m-0" style="color: var(--accent-blue); display: inline-block;">Index Analysis
+            </h2>
+            <span class="text-muted text-sm ml-2">Technical Analysis</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <!-- Spot Price moved here -->
+            <div
+                style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 0.25rem 1rem; border-radius: 4px; display: flex; align-items: center; gap: 0.5rem;">
+                <span style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">SPOT:</span>
+                <span style="font-size: 1.8rem; font-weight: 700; color: #fff; line-height: 1;">{{ latest_spot|int
+                    }}</span>
+            </div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline"
+                style="padding: 0.25rem 0.8rem; font-size: 0.85rem;">← Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Stats Row (Single Line) -->
+    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; width: 100%;">
+        <!-- 1. ADX (Small) -->
+        <div class="card"
+            style="padding: 0.5rem; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-card);">
+            <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">ADX ({{
+                adx_value|round(2) }})</div>
+            <div style="font-weight: 700; font-size: 0.9rem;"
+                class="{{ 'text-green' if 'Uptrend' in adx_status else 'text-red' if 'Downtrend' in adx_status else 'text-yellow' }}">
+                {{ adx_status }}
+            </div>
+        </div>
+
+        <!-- 2. OI Pressure (Wider) -->
+        <div class="card"
+            style="padding: 0.5rem; flex: 3; display: flex; align-items: center; background: var(--bg-card);">
+            <div style="width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.75rem;">
+                <!-- Full OI -->
+                <div style="padding-right: 0.5rem; border-right: 1px solid var(--border-color);"
+                    class="{{ 'text-green' if oi_stats.oi_signal == 'Bullish' else 'text-red' }}">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <span style="color: var(--text-muted); text-transform: uppercase; font-size: 0.65rem;">Full
+                            OI</span>
+                        <span style="font-weight: 700;">{{ '⬆' if oi_stats.oi_signal == 'Bullish' else '⬇' }} {{
+                            oi_stats.oi_diff_percent }}%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;"><span>CE: {{ oi_stats.ce_oi }}</span>
+                        <span>PE: {{ oi_stats.pe_oi }}</span>
+                    </div>
+                </div>
+                <!-- Change OI -->
+                <div style="padding-left: 0.5rem;"
+                    class="{{ 'text-green' if oi_stats.signal == 'Bullish' else 'text-red' }}">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                        <span style="color: var(--text-muted); text-transform: uppercase; font-size: 0.65rem;">Change
+                            OI</span>
+                        <span class="font-bold blink" style="font-weight: 700;">{{ '⬆' if oi_stats.signal == 'Bullish'
+                            else '⬇' }} {{ oi_stats.diff_percent }}%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;"><span>CE: {{ oi_stats.ce_total_change
+                            }}</span> <span>PE: {{ oi_stats.pe_total_change }}</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Sentiment (Medium) -->
+        <div class="card"
+            style="padding: 0.5rem; flex: 1.5; display: flex; align-items: center; justify-content: center; background: var(--bg-card);">
+            <div style="text-align: center;">
+                <h5 style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; margin: 0 0 2px 0;">
+                    Sentiment</h5>
+                <span class="blink {{ oi_stats.trend_color }}"
+                    style="font-size: 0.9rem; font-weight: 700; line-height: 1.1;">{{
+                    oi_stats.trend_text }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters (Single Line Forced) -->
+    <div class="card mb-2" style="padding: 0.25rem;">
+        <div class="card-body" style="padding: 0.25rem;">
+            <form method="GET" action="{{ url_for('admin.index_analysis') }}"
+                style="display: flex; flex-direction: row; align-items: center; gap: 0.5rem; white-space: nowrap; overflow-x: auto;">
+                <!-- Symbol -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); margin: 0;">Symbol</label>
+                    <select name="symbol" class="form-control"
+                        style="height: 1.5rem; padding: 0 0.5rem; font-size: 0.8rem; width: auto;"
+                        onchange="this.form.submit()">
+                        {% for s in symbols %}
+                        <option value="{{ s }}" {% if filters.symbol==s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Start Date -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); margin: 0;">Start</label>
+                    <input type="datetime-local" name="start_date" class="form-control"
+                        style="height: 1.5rem; padding: 0 0.5rem; font-size: 0.8rem; width: 140px;"
+                        value="{{ filters.start_date }}" onchange="this.form.submit()">
+                </div>
+
+                <!-- End Date -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); margin: 0;">End</label>
+                    <input type="datetime-local" name="end_date" class="form-control"
+                        style="height: 1.5rem; padding: 0 0.5rem; font-size: 0.8rem; width: 140px;"
+                        value="{{ filters.end_date }}" onchange="this.form.submit()">
+                </div>
+
+                <!-- Duration -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="font-size: 0.7rem; color: var(--text-muted); margin: 0;">Time</label>
+                    <select name="duration" class="form-control"
+                        style="height: 1.5rem; padding: 0 0.5rem; font-size: 0.8rem; width: auto;"
+                        onchange="this.form.submit()">
+                        <option value="1m" {% if filters.duration=='1m' %}selected{% endif %}>1m</option>
+                        <option value="2m" {% if filters.duration=='2m' %}selected{% endif %}>2m</option>
+                        <option value="3m" {% if filters.duration=='3m' %}selected{% endif %}>3m</option>
+                        <option value="5m" {% if filters.duration=='5m' %}selected{% endif %}>5m</option>
+                        <option value="10m" {% if filters.duration=='10m' %}selected{% endif %}>10m</option>
+                        <option value="15m" {% if filters.duration=='15m' %}selected{% endif %}>15m</option>
+                    </select>
+                </div>
+
+                <div>
+                    <button type="submit" class="btn btn-primary"
+                        style="height: 1.5rem; padding: 0 0.8rem; font-size: 0.8rem; line-height: 1.5rem;">Apply</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card bg-gray-900 border-gray-700">
+        <div class="card-body p-2">
+            <div id="indexChart" style="min-height: 600px;"></div>
+        </div>
+        <!-- Footer / Indicators Info -->
+        <div class="card-footer border-t border-gray-700 text-sm text-gray-400 flex gap-6" id="indicator-values">
+            <span>Hover over chart to see values</span>
+        </div>
+    </div>
+</div>
+
+<!-- ApexCharts -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Data from Flask
+        const rawData = {{ chart_data | tojson
+    }};
+
+    if (rawData.length === 0) {
+        document.getElementById('indexChart').innerHTML = '<div class="text-center text-muted p-10">No data available for selected range.</div>';
+        return;
+    }
+
+    // Prepare Series
+    // Use formatted string for X to avoid plotting gaps (Category Axis)
+    const ohlcData = rawData.map(d => {
+        const date = new Date(d.timestamp);
+        // Format: "DD MMM HH:mm"
+        const label = date.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        return {
+            x: label,
+            y: [d.open, d.high, d.low, d.close]
+        };
+    });
+
+    // MA 20 (Red)
+    const ma20Data = rawData.map(d => {
+        const date = new Date(d.timestamp);
+        const label = date.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        return {
+            x: label,
+            y: d.ma_20
+        };
+    });
+
+    // MA 200 (Blue)
+    const ma200Data = rawData.map(d => {
+        const date = new Date(d.timestamp);
+        const label = date.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        return {
+            x: label,
+            y: d.ma_200
+        };
+    });
+
+    var options = {
+        series: [{
+            name: 'KLine',
+            type: 'candlestick',
+            data: ohlcData
+        }, {
+            name: 'MA 20',
+            type: 'line',
+            data: ma20Data
+        }, {
+            name: 'MA 200',
+            type: 'line',
+            data: ma200Data
+        }],
+        chart: {
+            type: 'candlestick',
+            height: 600,
+            background: '#111827', // Dark bg
+            animations: { enabled: false },
+            toolbar: { show: true }
+        },
+        colors: ['#00E396', '#FF4560', '#008FFB'], // Candle (Green/Red handled by plotOptions), MA20 (Red), MA200 (Blue)
+        stroke: {
+            width: [1, 2, 2],
+            curve: 'smooth'
+        },
+        plotOptions: {
+            candlestick: {
+                colors: {
+                    upward: '#00E396',
+                    downward: '#FF4560'
+                }
+            }
+        },
+        xaxis: {
+            type: 'category',
+            tickAmount: 10,
+            tooltip: { enabled: true },
+            labels: { style: { colors: '#9ca3af' } },
+            axisBorder: { show: false },
+            axisTicks: { show: false }
+        },
+        yaxis: {
+            tooltip: { enabled: true },
+            labels: {
+                style: { colors: '#9ca3af' },
+                formatter: function (val) {
+                    return val.toFixed(2);
+                }
+            }
+        },
+        grid: {
+            borderColor: '#374151',
+            strokeDashArray: 4,
+            xaxis: { lines: { show: true } }
+        },
+        theme: {
+            mode: 'dark'
+        },
+        tooltip: {
+            shared: true,
+            custom: function ({ series, seriesIndex, dataPointIndex, w }) {
+                const d = rawData[dataPointIndex];
+                if (!d) return '';
+
+                // Update Footer values dynamically
+                const footer = document.getElementById('indicator-values');
+                footer.innerHTML = `
+                        <span class="text-gray-300">Date: ${new Date(d.timestamp).toLocaleString()}</span>
+                        <span class="text-green-400">ATR: ${d.atr?.toFixed(2) || '-'}</span>
+                        <span class="text-yellow-400">ADX: ${d.adx?.toFixed(2) || '-'}</span>
+                        <span class="text-red-400">MA20: ${d.ma_20?.toFixed(2) || '-'}</span>
+                        <span class="text-blue-400">MA200: ${d.ma_200?.toFixed(2) || '-'}</span>
+                    `;
+
+                // Return standard tooltip for chart
+                return '' +
+                    '<div class="arrow_box p-2 bg-gray-800 border border-gray-600 text-sm">' +
+                    '<div class="mb-1 border-b border-gray-600 pb-1 font-bold text-gray-300">' + 'Time: ' + new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '</div>' +
+                    '<div class="grid grid-2 gap-x-4">' +
+                    '<div>Open: <span class="text-white">' + d.open.toFixed(2) + '</span></div>' +
+                    '<div>High: <span class="text-white">' + d.high.toFixed(2) + '</span></div>' +
+                    '<div>Low: <span class="text-white">' + d.low.toFixed(2) + '</span></div>' +
+                    '<div>Close: <span class="text-white">' + d.close.toFixed(2) + '</span></div>' +
+                    '</div>' +
+                    '<div class="mt-2 border-t border-gray-600 pt-1 grid grid-2 gap-x-4">' +
+                    '<div>ADX: <span class="text-yellow-400">' + (d.adx?.toFixed(2) || '-') + '</span></div>' +
+                    '<div>ATR: <span class="text-green-400">' + (d.atr?.toFixed(2) || '-') + '</span></div>' +
+                    '<div>MA20: <span class="text-red-400">' + (d.ma_20?.toFixed(2) || '-') + '</span></div>' +
+                    '<div>MA200: <span class="text-blue-400">' + (d.ma_200?.toFixed(2) || '-') + '</span></div>' +
+                    '</div>' +
+                    '</div>';
+            }
+        }
+    };
+
+    var chart = new ApexCharts(document.querySelector("#indexChart"), options);
+    chart.render();
+    });
+</script>
+{% endblock %}

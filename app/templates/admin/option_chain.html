@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Option Chain - Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 2rem; max-width: 1600px;">
+    <!-- Header -->
+    <div class="flex-row items-center justify-between mb-4">
+        <div>
+            <h2 class="text-2xl font-bold">Option Chain Viewer</h2>
+            <p class="text-muted">Real-time Options Data Stream</p>
+        </div>
+        <div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline mr-2">← Dashboard</a>
+            <a href="{{ url_for('admin.option_chain', action='export', **filters) }}" class="btn btn-success">
+                📊 Export Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Spot Price -->
+    <div class="card mb-4 bg-gray-800 border-gray-700">
+        <div class="card-body flex-row items-center justify-between">
+            <div>
+                <h3 class="text-xl font-bold text-white">Current Spot: <span class="text-primary">{{
+                        "%.2f"|format(current_spot) }}</span></h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('admin.option_chain') }}" class="grid grid-4 gap-4 items-end">
+                <!-- Underlying -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Underlying</label>
+                    <select name="underlying" class="form-control form-control-sm" onchange="this.form.submit()">
+                        {% for u in underlyings %}
+                        <option value="{{ u }}" {% if filters.underlying==u %}selected{% endif %}>{{ u }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Expiry -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Expiry Date</label>
+                    <select name="expiry" class="form-control form-control-sm" onchange="this.form.submit()">
+                        {% for e in expiries %}
+                        <option value="{{ e }}" {% if filters.expiry==e|string %}selected{% endif %}>{{
+                            e.strftime('%Y-%m-%d') }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Strike -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Strike Price</label>
+                    <input type="number" name="strike" class="form-control form-control-sm" placeholder="Filter Strike"
+                        value="{{ filters.strike }}">
+                </div>
+
+                <!-- Buttons -->
+                <div class="form-group flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-full">Apply</button>
+                    <a href="{{ url_for('admin.option_chain') }}" class="btn btn-outline btn-sm">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Data Grid -->
+    <div class="card p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm text-center">
+                <thead class="bg-dark">
+                    <tr>
+                        <th colspan="5" class="text-green border-r">CALLS (CE)</th>
+                        <th colspan="2" class="bg-secondary text-white">STRIKE</th>
+                        <th colspan="5" class="text-red border-l">PUTS (PE)</th>
+                    </tr>
+                    <tr class="text-xs text-muted">
+                        <th>OI</th>
+                        <th>Vol</th>
+                        <th>IV</th>
+                        <th>Chg%</th>
+                        <th class="border-r">LTP</th>
+
+                        <th class="bg-secondary">Exp</th>
+                        <th class="bg-secondary">Price</th>
+
+                        <th class="border-l">LTP</th>
+                        <th>Chg%</th>
+                        <th>IV</th>
+                        <th>Vol</th>
+                        <th>OI</th>
+                    </tr>
+                </thead>
+                <tbody class="text-sm">
+                    {% for row in option_data %}
+                    <tr>
+                        <!-- CE Data -->
+                        <td class="text-muted">{{ row.ce_oi or '-' }}</td>
+                        <td>{{ row.ce_volume or '-' }}</td>
+                        <td>{{ row.ce_iv or '-' }}</td>
+                        <td class="{{ 'text-green' if row.ce_change_percent > 0 else 'text-red' }}">
+                            {{ "%.2f"|format(row.ce_change_percent) if row.ce_change_percent else '-' }}%
+                        </td>
+                        <td class="font-bold border-r {{ 'text-green' if row.ce_change > 0 else 'text-red' }}">
+                            {{ row.ce_ltp or '-' }}
+                        </td>
+
+                        <!-- Center Strike -->
+                        <td class="bg-card text-xs text-muted">{{ row.expiry_date.strftime('%d%b') }}</td>
+                        <td class="bg-card font-bold">{{ row.strike_price }}</td>
+
+                        <!-- PE Data -->
+                        <td class="font-bold border-l {{ 'text-green' if row.pe_change > 0 else 'text-red' }}">
+                            {{ row.pe_ltp or '-' }}
+                        </td>
+                        <td class="{{ 'text-green' if row.pe_change_percent > 0 else 'text-red' }}">
+                            {{ "%.2f"|format(row.pe_change_percent) if row.pe_change_percent else '-' }}%
+                        </td>
+                        <td>{{ row.pe_iv or '-' }}</td>
+                        <td>{{ row.pe_volume or '-' }}</td>
+                        <td class="text-muted">{{ row.pe_oi or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="12" class="py-4 text-muted">No data available for selected criteria. Run the stream
+                            script to fetch data.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .border-r {
+        border-right: 1px solid var(--border-color);
+    }
+
+    .border-l {
+        border-left: 1px solid var(--border-color);
+    }
+
+    .bg-secondary {
+        background-color: #222;
+    }
+
+    .table-sm td,
+    .table-sm th {
+        padding: 0.4rem;
+    }
+
+    .text-xs {
+        font-size: 0.75rem;
+    }
+</style>
+{% endblock %}

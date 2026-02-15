@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Algo Trading Platform{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 500px; margin-top: 5rem;">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title text-center">Login</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('auth.login') }}">
+                {{ form.hidden_tag() }}
+
+                <div class="form-group">
+                    {{ form.email.label(class="form-label") }}
+                    {{ form.email(class="form-control", placeholder="Enter your email") }}
+                    {% if form.email.errors %}
+                    <small class="text-red">{{ form.email.errors[0] }}</small>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    {{ form.password.label(class="form-label") }}
+                    {{ form.password(class="form-control", placeholder="Enter your password") }}
+                    {% if form.password.errors %}
+                    <small class="text-red">{{ form.password.errors[0] }}</small>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="text-center mt-2">
+        <a href="{{ url_for('main.home') }}" class="text-muted">← Back to Home</a>
+    </div>
+</div>
+{% endblock %}

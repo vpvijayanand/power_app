@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Algo Trading Platform{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">Admin Dashboard</h1>
+        <p class="text-muted">System Overview & User Management</p>
+    </div>
+
+    <!-- System Statistics -->
+    <div class="dashboard-stats">
+        <div class="stat-card">
+            <div class="stat-label">Total Users</div>
+            <div class="stat-value blue">{{ stats.total_users }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-label">Active Users</div>
+            <div class="stat-value green">{{ stats.active_users }}</div>
+        </div>
+        <div class="card bg-card">
+            <div class="card-body">
+                <h5 class="text-muted">Total Balance</h5>
+                <h3 class="text-xl">₹{{ "{:,.2f}".format(stats.total_balance) }}</h3>
+            </div>
+        </div>
+
+        <div class="card bg-card">
+            <div class="card-body">
+                <h5 class="text-muted">Avg. Growth</h5>
+                <h3 class="text-xl {{ 'text-green' if stats.avg_growth >= 0 else 'text-red' }}">
+                    {{ "{:+.2f}".format(stats.avg_growth) }}%
+                </h3>
+            </div>
+        </div>
+
+        <div class="card bg-card flex items-center justify-center">
+            <a href="{{ url_for('admin.instruments') }}" class="btn btn-outline w-full text-center">
+                📉 View Instruments
+            </a>
+        </div>
+    </div>
+
+    <!-- User Management -->
+    <div class="card mt-3">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 class="card-title" style="margin: 0;">User Management</h3>
+            <div style="display: flex; gap: 1rem;">
+                <a href="{{ url_for('admin.export_users') }}" class="btn btn-success">📊 Export to Excel</a>
+                <a href="{{ url_for('auth.register') }}" class="btn btn-primary">+ Add New User</a>
+            </div>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>S.No</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Type</th>
+                        <th>Trade Mode</th>
+                        <th>Balance</th>
+                        <th>Growth</th>
+                        <th>Kite</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            {% if user.user_type == 'Admin' %}
+                            <span class="badge badge-warning">{{ user.user_type }}</span>
+                            {% else %}
+                            <span class="badge badge-info">{{ user.user_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.trade_mode == 'Live' %}
+                            <span class="badge badge-success">{{ user.trade_mode }}</span>
+                            {% else %}
+                            <span class="badge badge-info">{{ user.trade_mode }}</span>
+                            {% endif %}
+                        </td>
+                        <td>₹{{ "%.2f"|format(user.kite_account_balance|float) }}</td>
+                        <td
+                            class="{{ 'text-green' if user.account_growth_percentage|float > 0 else 'text-red' if user.account_growth_percentage|float < 0 else '' }}">
+                            {{ "%.2f"|format(user.account_growth_percentage|float) }}%
+                        </td>
+                        <td>
+                            {% if user.request_token %}
+                            <span class="badge badge-success">✓</span>
+                            {% else %}
+                            <span class="badge badge-danger">✗</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if user.is_active %}
+                            <span class="badge badge-success">Active</span>
+                            {% else %}
+                            <span class="badge badge-danger">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <a href="{{ url_for('admin.edit_user', user_id=user.id) }}"
+                                    class="btn btn-sm btn-primary">Edit</a>
+
+                                {% if user.id != current_user.id %}
+                                <form method="POST" action="{{ url_for('admin.toggle_user', user_id=user.id) }}"
+                                    style="display: inline;">
+                                    {% if user.is_active %}
+                                    <button type="submit" class="btn btn-sm btn-danger">Deactivate</button>
+                                    {% else %}
+                                    <button type="submit" class="btn btn-sm btn-success">Activate</button>
+                                    {% endif %}
+                                </form>
+                                {% else %}
+                                <span class="text-muted" style="font-size: 0.8rem;">You</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Algo Trading Platform{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <!-- Login Button (Top Right) -->
+    <div class="login-button-top">
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-lg">Login</a>
+    </div>
+
+    <!-- Animated Glowing Title -->
+    <h1 class="hero-title">Your Gateway to Success</h1>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Algo Trading Platform{% endblock %}</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    {% block extra_css %}
+    <style>
+        @keyframes blinker {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .blink {
+            animation: blinker 1s linear infinite;
+        }
+    </style>
+    {% endblock %}
+</head>
+
+<body>
+    <!-- Navigation Bar -->
+    {% if session.get('user_id') %}
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar-content">
+                <a href="{{ url_for('main.home') }}" class="navbar-brand">⚡ AlgoTrade</a>
+
+                <ul class="navbar-menu">
+                    {% if session.get('user_type') == 'Admin' %}
+                    <li><a href="{{ url_for('admin.dashboard') }}" class="navbar-link">Dashboard</a></li>
+                    <li><a href="{{ url_for('admin.instruments') }}" class="navbar-link">Instruments</a></li>
+                    <li><a href="{{ url_for('admin.index_analysis') }}" class="navbar-link">Index Analysis</a></li>
+
+                    <!-- Options Dropdown -->
+                    <li class="dropdown">
+                        <a href="#" class="navbar-link dropdown-toggle">Options ▾</a>
+                        <div class="dropdown-menu">
+                            <a href="{{ url_for('admin.option_chain') }}" class="dropdown-item">Option Chain</a>
+                            <a href="{{ url_for('admin.option_analysis') }}" class="dropdown-item">Analysis</a>
+                            <a href="{{ url_for('admin.option_crossover') }}" class="dropdown-item">Cross Over</a>
+                        </div>
+                    </li>
+
+                    <li><a href="{{ url_for('auth.register') }}" class="navbar-link">Add User</a></li>
+                    <li><a href="{{ url_for('kite.credentials') }}" class="navbar-link">Kite Settings</a></li>
+                    {% else %}
+                    <li><a href="{{ url_for('dashboard.client_dashboard') }}" class="navbar-link">Dashboard</a></li>
+                    <li><a href="{{ url_for('kite.credentials') }}" class="navbar-link">Kite Settings</a></li>
+                    {% endif %}
+
+                    <li class="navbar-user">
+                        <span>{{ session.get('user_name') }}</span>
+                        <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="container mt-2">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

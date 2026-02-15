@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Instruments - Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 2rem;">
+    <!-- Header -->
+    <div class="flex-row items-center justify-between mb-4">
+        <div>
+            <h2 class="text-2xl font-bold">Instruments Data</h2>
+            <p class="text-muted">View, filter, and export instruments fetched from Kite</p>
+        </div>
+        <div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline mr-2">← Back to Dashboard</a>
+            <a href="{{ url_for('admin.instruments', action='export', **filters) }}" class="btn btn-success">
+                📊 Export to Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('admin.instruments') }}" class="grid grid-5 gap-4 items-end">
+                <!-- Search -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm"
+                        placeholder="Symbol, Name or Token" value="{{ filters.search }}">
+                </div>
+
+                <!-- Exchange -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Exchange</label>
+                    <select name="exchange" class="form-control form-control-sm">
+                        <option value="">All Exchanges</option>
+                        {% for ex in exchanges %}
+                        <option value="{{ ex }}" {% if filters.exchange==ex %}selected{% endif %}>{{ ex }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Type -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Instrument Type</label>
+                    <select name="type" class="form-control form-control-sm">
+                        <option value="">All Types</option>
+                        {% for t in types %}
+                        <option value="{{ t }}" {% if filters.type==t %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Segment -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Segment</label>
+                    <select name="segment" class="form-control form-control-sm">
+                        <option value="">All Segments</option>
+                        {% for s in segments %}
+                        <option value="{{ s }}" {% if filters.segment==s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Expiry -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Expiry Date</label>
+                    <select name="expiry" class="form-control form-control-sm">
+                        <option value="">All Expiries</option>
+                        {% for e in expiries %}
+                        <option value="{{ e }}" {% if filters.expiry==e|string %}selected{% endif %}>{{
+                            e.strftime('%Y-%m-%d') }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Buttons -->
+                <div class="form-group flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm w-full">Apply Filters</button>
+                    <a href="{{ url_for('admin.instruments') }}" class="btn btn-outline btn-sm">Reset</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Token</th>
+                        <th>Symbol</th>
+                        <th>Name</th>
+                        <th>Exchange</th>
+                        <th>Type</th>
+                        <th>Expiry</th>
+                        <th>Strike</th>
+                        <th>Lot</th>
+                        <th>Price</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inst in instruments %}
+                    <tr>
+                        <td><small class="text-muted">{{ inst.instrument_token }}</small></td>
+                        <td class="font-medium">{{ inst.tradingsymbol }}</td>
+                        <td>{{ inst.name or '-' }}</td>
+                        <td><span class="badge badge-outline">{{ inst.exchange }}</span></td>
+                        <td>{{ inst.instrument_type or '-' }}</td>
+                        <td>{{ inst.expiry or '-' }}</td>
+                        <td>{{ inst.strike if inst.strike else '-' }}</td>
+                        <td>{{ inst.lot_size }}</td>
+                        <td>{{ inst.last_price if inst.last_price else '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center py-4">
+                            <p class="text-muted">No instruments found matching your filters.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="pagination-container mt-4 flex justify-center">
+        <div class="pagination">
+            <!-- Previous -->
+            {% if pagination.has_prev %}
+            <a href="{{ url_for('admin.instruments', page=pagination.prev_num, **filters) }}" class="page-link">&laquo;
+                Prev</a>
+            {% else %}
+            <span class="page-link disabled">&laquo; Prev</span>
+            {% endif %}
+
+            <!-- Page Numbers -->
+            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if page_num %}
+            {% if page_num == pagination.page %}
+            <span class="page-link active">{{ page_num }}</span>
+            {% else %}
+            <a href="{{ url_for('admin.instruments', page=page_num, **filters) }}" class="page-link">{{ page_num }}</a>
+            {% endif %}
+            {% else %}
+            <span class="page-link disabled">...</span>
+            {% endif %}
+            {% endfor %}
+
+            <!-- Next -->
+            {% if pagination.has_next %}
+            <a href="{{ url_for('admin.instruments', page=pagination.next_num, **filters) }}" class="page-link">Next
+                &raquo;</a>
+            {% else %}
+            <span class="page-link disabled">Next &raquo;</span>
+            {% endif %}
+        </div>
+        <div class="text-center mt-2">
+            <small class="text-muted">
+                Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} to
+                {{ [(pagination.page * pagination.per_page), pagination.total] | min }}
+                of {{ pagination.total }} records
+            </small>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .pagination {
+        display: flex;
+        list-style: none;
+        padding: 0;
+        gap: 0.25rem;
+    }
+
+    .page-link {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        color: var(--text-color);
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+
+    .page-link:hover:not(.disabled) {
+        background-color: var(--bg-card);
+        border-color: var(--accent-color);
+    }
+
+    .page-link.active {
+        background-color: var(--accent-color);
+        border-color: var(--accent-color);
+        color: white;
+    }
+
+    .page-link.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .badge-outline {
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+    }
+</style>
+{% endblock %}

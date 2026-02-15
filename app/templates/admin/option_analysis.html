@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Option Analysis - Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="margin-top: 2rem; max-width: 1600px;">
+    <!-- Header -->
+    <div class="flex-row items-center justify-between mb-4">
+        <div>
+            <h2 class="text-2xl font-bold">Option Chain Analysis</h2>
+            <p class="text-muted">Visual Analysis of Open Interest</p>
+        </div>
+        <div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline mr-2">← Back to Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Spot Price -->
+    <div class="card mb-4 bg-gray-800 border-gray-700">
+        <div class="card-body flex-row items-center justify-between">
+            <div>
+                <h3 class="text-xl font-bold text-white">Current Spot: <span class="text-primary">{{
+                        "%.2f"|format(current_spot) }}</span></h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" action="{{ url_for('admin.option_analysis') }}" class="grid grid-4 gap-4 items-end">
+                <!-- Underlying -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Underlying</label>
+                    <select name="underlying" class="form-control form-control-sm" onchange="this.form.submit()">
+                        {% for u in underlyings %}
+                        <option value="{{ u }}" {% if filters.underlying==u %}selected{% endif %}>{{ u }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Expiry -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Expiry Date</label>
+                    <select name="expiry" class="form-control form-control-sm" onchange="this.form.submit()">
+                        {% for e in expiries %}
+                        <option value="{{ e }}" {% if filters.expiry==e|string %}selected{% endif %}>{{
+                            e.strftime('%Y-%m-%d') }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Date -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Date</label>
+                    <input type="date" name="date" class="form-control form-control-sm" value="{{ filters.date }}"
+                        onchange="this.form.submit()">
+                </div>
+
+                <!-- Range -->
+                <div class="form-group">
+                    <label class="form-label text-sm">Range (+/-)</label>
+                    <input type="number" name="range" class="form-control form-control-sm" value="{{ filters.range }}"
+                        min="1" max="50" onchange="this.form.submit()">
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-2 gap-4">
+        <!-- Total OI Chart -->
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Total Open Interest (OI)</h4>
+            </div>
+            <div class="card-body">
+                <canvas id="totalOIChart" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- OI Change Chart -->
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Change in OI (Today)</h4>
+            </div>
+            <div class="card-body">
+                <canvas id="oiChangeChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const data = [
+            {% for row in data %}
+            {
+            strike: {{ row.strike_price }},
+        ce_oi: {{ row.ce_oi or 0 }},
+        pe_oi: {{ row.pe_oi or 0 }},
+        ce_change: {{ row.ce_oi_change or 0 }},
+        pe_change: {{ row.pe_oi_change or 0 }}
+            },
+        {% endfor %}
+        ];
+
+    const strikes = data.map(d => d.strike);
+
+    // --- Total OI Chart ---
+    const ctxOI = document.getElementById('totalOIChart').getContext('2d');
+    new Chart(ctxOI, {
+        type: 'bar',
+        data: {
+            labels: strikes,
+            datasets: [
+                {
+                    label: 'CE OI',
+                    data: data.map(d => d.ce_oi),
+                    backgroundColor: 'rgba(255, 0, 85, 0.7)', // Red
+                    borderColor: 'rgba(255, 0, 85, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'PE OI',
+                    data: data.map(d => d.pe_oi),
+                    backgroundColor: 'rgba(0, 255, 136, 0.7)', // Green
+                    borderColor: 'rgba(0, 255, 136, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top', labels: { color: '#ffffff' } },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: '#333' } },
+                y: { ticks: { color: '#888' }, grid: { color: '#333' } }
+            }
+        }
+    });
+
+    // --- OI Change Chart ---
+    const ctxChange = document.getElementById('oiChangeChart').getContext('2d');
+    new Chart(ctxChange, {
+        type: 'bar',
+        data: {
+            labels: strikes,
+            datasets: [
+                {
+                    label: 'CE OI Change',
+                    data: data.map(d => d.ce_change),
+                    backgroundColor: 'rgba(255, 0, 85, 0.7)', // Red
+                    borderColor: 'rgba(255, 0, 85, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'PE OI Change',
+                    data: data.map(d => d.pe_change),
+                    backgroundColor: 'rgba(0, 255, 136, 0.7)', // Green
+                    borderColor: 'rgba(0, 255, 136, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'top', labels: { color: '#ffffff' } },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                x: { ticks: { color: '#888' }, grid: { color: '#333' } },
+                y: { ticks: { color: '#888' }, grid: { color: '#333' } }
+            }
+        }
+    });
+    });
+</script>
+{% endblock %}

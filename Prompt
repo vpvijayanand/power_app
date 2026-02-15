@@ -1,0 +1,390 @@
+I want to build a scalable, multi-user Algo Trading Web Application using:
+
+Backend: Flask (Python)
+
+Database: PostgreSQL
+
+Trading API: Zerodha Kite API (for market data & order execution)
+
+The system must be production-ready, modular, and easy to scale.
+
+🎨 UI / UX Design Requirements
+🎯 Overall Theme
+
+Dominant background: Deep Black
+
+Accent colors:
+
+Illuminated Green → Positive trends / Profit
+
+Illuminated Red → Negative trends / Loss
+
+Illuminated Blue → Headings, highlights, buttons
+
+White → Normal text
+
+🖥 Visual Feel
+
+Must look:
+
+Clean
+
+Crisp
+
+Premium
+
+Professional trading terminal style
+
+Since many charts and real-time market data will be displayed:
+
+Use a highly readable modern font (e.g., Inter, Roboto, Montserrat)
+
+Small but clear font sizes for data-heavy components
+
+Compact cards and panels
+
+Sharp borders and subtle glow effects
+
+Proper spacing for high data density
+
+📊 Charts
+
+Charts must look modern and smooth
+
+Positive candles/lines → Green
+
+Negative candles/lines → Red
+
+Neutral elements → Blue or White
+
+🏠 Homepage (Public)
+
+Black background
+
+Centered large animated glowing text:
+
+"Your Gateway to Success"
+
+Text should:
+
+Be very large
+
+Have illuminated glow effect
+
+Have subtle animated color transition
+
+Top-right: Login button
+
+No other content on homepage
+
+🔐 Authentication System
+
+After login:
+
+Redirect to user-specific dashboard
+
+There are only two types of users:
+
+Admin
+
+Client
+
+Role-based access control must be implemented.
+
+📂 Project Structure Requirements
+
+The Flask application must be:
+
+Modular (Blueprint-based architecture)
+
+Easy to scale
+
+Cleanly separated:
+
+auth
+
+dashboard
+
+admin
+
+trading
+
+api
+
+services
+
+models
+
+Use:
+
+Application Factory pattern
+
+SQLAlchemy ORM
+
+Flask-Migrate
+
+Environment variables
+
+Proper config management (Dev / Prod)
+
+👥 Multi-User Design
+
+Each user has:
+
+Their own Kite credentials
+
+Their own trade mode (Live or Paper)
+
+Their own lot size
+
+Their own account growth tracking
+
+The system must properly isolate users
+
+Secure password hashing required
+
+Secure session handling required
+
+🔗 Zerodha Kite Integration
+
+Each user will store:
+
+api_key
+
+api_secret
+
+request_token (daily)
+
+kite_callback_token (unique per user)
+
+The kite_callback_token will:
+
+Be given to users
+
+Used as their callback URL parameter
+
+Help identify which user the returned request_token belongs to
+
+The system must:
+
+Handle callback
+
+Store request_token properly
+
+Fetch account balance
+
+Store kite_account_balance
+
+Update last_balance_update timestamp
+
+🗄 Required PostgreSQL User Table
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    mobile VARCHAR(15) DEFAULT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+
+    api_key VARCHAR(100) DEFAULT NULL,
+    api_secret VARCHAR(100) DEFAULT NULL,
+    request_token TEXT DEFAULT NULL,
+    kite_callback_token VARCHAR(128) DEFAULT NULL,
+
+    user_type VARCHAR(20) NOT NULL, -- Admin or Client
+    trade_mode VARCHAR(20) NOT NULL, -- Live or Paper
+    lot_size INTEGER NOT NULL,
+
+    account_growth_percentage NUMERIC(15,2) NOT NULL,
+    kite_account_balance NUMERIC(15,2) NOT NULL,
+
+    is_active BOOLEAN NOT NULL,
+
+    created_at TIMESTAMP DEFAULT NULL,
+    updated_at TIMESTAMP DEFAULT NULL,
+    last_balance_update TIMESTAMP DEFAULT NULL
+);
+
+📊 Dashboard Requirements
+
+After login:
+
+For Client:
+
+Account balance
+
+Growth percentage (Green if positive, Red if negative)
+
+Current trade mode
+
+Charts
+
+Trade history
+
+Live PnL
+
+Market trend indicators
+
+For Admin:
+
+View all users
+
+Activate / Deactivate users
+
+View user growth
+
+View balances
+
+System statistics
+
+🔒 Security Requirements
+
+Use hashed passwords (Werkzeug security)
+
+CSRF protection
+
+Role-based route protection
+
+Environment variables for secrets
+
+Never expose API secrets to frontend
+
+⚙️ Extra Requirements
+
+Use base template layout (base.html)
+
+Extend templates using Jinja
+
+Use reusable components (cards, panels, navbars)
+
+Prepare system for future:
+
+WebSocket integration
+
+Real-time streaming
+
+Strategy engine module
+
+🎯 Final Goal
+
+Build a:
+
+Modern, Black-themed, Premium Algo Trading Platform
+That is scalable, multi-user, secure, and visually powerful.
+
+I have a postgre databse with database power_app and the username and password is postgres
+
+http://localhost:5000 when I move mouse to the login buttion the button become complete white and no text is visible  correct it also for admin and other client I need to update the kite_key etc. the CRUD opetaion is missing and how to Loin into the KITe to get the request token that is also missing for a user give serial no to users and there must be option for admin to download the data for all tables in a excel format
+
+
+I need to create a standalone script folder to get the instiuments data from the kite and store in the instuments table. also I need a page for admin user to visulise the instuments data with all the necessay multifilters and also thare must be an option to export the data to a excel based on the filter that is applided or no filter option to download the complete data
+
+I need to create a webscoket which  which gets all the data of options of the next upcoming 4 four expiry of nifty if the nearest date of umcoming expirty is the same day also please add that dont miss it you can get the next upcoming four expiry from the instuments table where you have complete details of instument token etc. and store in the below table for nifty and for banknifty just take upcoming 2 expirty as they are only monthly expiry.  
+CREATE TABLE "option_chain_data" (
+	"id" SERIAL NOT NULL,
+	"underlying" VARCHAR(20) NOT NULL,
+	"strike_price" DOUBLE PRECISION NOT NULL,
+	"expiry_date" DATE NOT NULL,
+	"ce_oi" INTEGER NULL DEFAULT NULL,
+	"ce_oi_change" INTEGER NULL DEFAULT NULL,
+	"ce_volume" INTEGER NULL DEFAULT NULL,
+	"ce_ltp" DOUBLE PRECISION NULL DEFAULT NULL,
+	"ce_change" DOUBLE PRECISION NULL DEFAULT NULL,
+	"ce_change_percent" DOUBLE PRECISION NULL DEFAULT NULL,
+	"ce_iv" DOUBLE PRECISION NULL DEFAULT NULL,
+	"pe_oi" INTEGER NULL DEFAULT NULL,
+	"pe_oi_change" INTEGER NULL DEFAULT NULL,
+	"pe_volume" INTEGER NULL DEFAULT NULL,
+	"pe_ltp" DOUBLE PRECISION NULL DEFAULT NULL,
+	"pe_change" DOUBLE PRECISION NULL DEFAULT NULL,
+	"pe_change_percent" DOUBLE PRECISION NULL DEFAULT NULL,
+	"pe_iv" DOUBLE PRECISION NULL DEFAULT NULL,
+	"timestamp" TIMESTAMP NOT NULL,
+	"is_current_expiry" BOOLEAN NULL DEFAULT NULL,
+	"ce_strike_symbol" VARCHAR(100) NULL DEFAULT NULL,
+	"ce_instrument_token" VARCHAR(50) NULL DEFAULT NULL,
+	"pe_strike_symbol" VARCHAR(100) NULL DEFAULT NULL,
+	"pe_instrument_token" VARCHAR(50) NULL DEFAULT NULL,
+	PRIMARY KEY ("id")
+)
+
+in the navbar change the option chain to options and below it keep option chain as a submenu  also check if the option chain data the default filter must be the next up comming expiry and the underlying must be nifty. also cleate one more sub meu called Option Chain analysis to see the option chain data in a bar graph mode having default as  filter as above and two graph one to  see the OI for each of the the stike price CE and PE let the CE oi bar graph have Red in color and PE oi bar have green in color. another graph it see only the change in the OI for today let it be also use the same color pattern   
+
+I need to create one more submenu called cross_over.  which is a line graph which  which shows the timeline in the X axis and how OI has changed for CE and PE sum for current expiry current day and nifty instument all 3 must be in the fiilter the CE OI in light red color and PE OI in light green color also it must have CE OI_change in dark red color or thicker then the OI and PE OI Cahnge in dark green color or thicker then the OI also show the nifty one minite change graph as blue color in the graph I need background black with grid lines in white which is very thin but cleary visible. also add this default filet in option analysis bar graph page also i think date is missing in all the places the nifty to be default current expirty to be default and today data to be default 
+
+I think we have not stored nifty and banknity  add this also to the above prompt index price create a table called index data using websocket so that I get and store  while storing it self it must also calculate 
+ MA_20, Moving average 20
+     MA_200, Moving average 200.
+     FAST_MA_39 Moving average 39
+     FAST_MA_69 Moving average 69
+     ATR, average true value
+     ADX, Average Directional Index value  and update 
+     for  
+     "supertrend" DOUBLE PRECISION NULL DEFAULT NULL,
+	"supertrend_direction" INTEGER NULL DEFAULT NULL,
+    "SuperTrend_variation like default 10,3
+    "Super_power" value DEFAULT NULL,(to store Renko signal Buy or sell)
+     Super_power_brick Value ( to store Renko brick size) default 10 
+     will create seperate script to update 
+     the complete table is 
+	"id" SERIAL NOT NULL,
+   	"timestamp" TIMESTAMP NULL DEFAULT NULL,
+	"open" DOUBLE PRECISION NULL DEFAULT NULL,
+	"high" DOUBLE PRECISION NULL DEFAULT NULL,
+	"low" DOUBLE PRECISION NULL DEFAULT NULL,
+	"close" DOUBLE PRECISION NULL DEFAULT NULL,
+	"instrument_token" INTEGER NULL DEFAULT NULL,
+	"symbol" VARCHAR NULL DEFAULT NULL, (Nifty,Banknifty)
+	"supertrend" DOUBLE PRECISION NULL DEFAULT NULL,
+	"supertrend_direction" INTEGER NULL DEFAULT NULL,
+    "SuperTrend_variation like default 10,3
+    "Super_power" value DEFAULT NULL,(to store Renko signal Buy or sell)
+     Super_power_brick Value ( to store Renko brick size) default 10
+     MA_20, Moving average 20
+     MA_200, Moving average 200.
+     FAST_MA_39 Moving average 39
+     FAST_MA_69 Moving average 69
+     ATR, average true value
+     ADX, Average Directional Index value 
+	PRIMARY KEY ("id")
+;
+http://localhost:5000/admin/option-analysis page there must be other filter called range if
+ the range is 5 it must take the current nifty price and show only 5 above strike and 5 
+ below strike of ce and be let the default be 6 also the change % is all blank add some 
+ value to it so that I can check all ht efunctions how it works very clearly.
+in all the options pages like chain, analysis, crossover show the nifty and banknifty 
+current price in a prominat way also I am not able to check the cross over graph as it 
+is completely bank is the OI change has some valid demo dat to visulize it check and 
+create it so that we can check it
+
+Now i need to create a navbar menu index to show the graphpical view of index.
+which has filter like Symbol, startdate time, end date time, Duration, 1m,2m,3m,5m,10m,15m, 
+which show the timestap at the botttom and the nifty chart in the candel form showing open,high,low and close also showing 
+the ma_20, as a line graph color red and Ma_200 as aline graph color blue,with ATR and ADX value
+at the bottom for each timeshmap. the x axis timestamp must have exactly the data taken from the
+databse as there will be a gap from 3:30pm to 9:15am everyday and the saturday sunday, holodays 
+so show only the data which is visible. I have given the sample Candel view generate the graph
+exatly like that.  The index table has data for one minit. so if the duration ti changed in filter to
+2m or 5m, it must auto calculate the data based on the one mit open,high,low and close and displayed
+the data. sample candel graph given as input dont use trading graph as it is not free use soething which is free to use.
+Let the default start date and time be today 9:15am to today 3:30pm and the default dulation
+ in 1 min. Data picker is not working for start data check it also the ATR and ADX value
+  is not shown in the graph when the mouse is moved over the graph it shows open,high,low 
+  and close in addition I need to show timestamp, ADX,ATR MA20 and MA200 value in it
+
+http://localhost:5000/admin/index-analysis
+in this page the   apply buttun is in the labe line of filter change to the textbox line of the
+filter. I need to chow the prominent value of current Nifty and bank nifty price also based on the 
+ADX value it must show how the current trend is at the top as prominat value.
+also I need to get the Sum of OI_change of CE and PE from the options chain data and show if the 
+CE OI change  is high then the PE OI change calculate the % diff between them and show the box with Downarrow
+and the % diff and the complet box in red color. IF PE OI change is high then show the box as 
+green in color with a blinking up arrow with %diff value in it. 
+Also check for the last 15 min and 30 min how is the OICahnge of CE and OI cahnge of PE
+if CE and PE change value or consitant display Trend Contious as text in white blinking
+If CE is reducing and PE in increating show text as trend is moving towards upwards and
+if CE is increasing and PE is reducing show as trend moving towards downwards 
+if CE is consistnat and PE is increating  show CE is consistand so could be a sudden downside move
+if PE is Consistant and CE is increasing show PE is consistant so could be a sudden upside move
+if PE is reducing and CE is increaing show stong downside move
+if Ce is reducing and PE is increating show a strong upside move  
+
