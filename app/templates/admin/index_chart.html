@@ -157,11 +157,12 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // Data from Flask
-        const rawData = {{ chart_data | tojson
-    }};
+        try {
+            // Data from Flask
+            const rawData = {{ chart_data | tojson | safe
+        }};
 
-    if (rawData.length === 0) {
+    if (!rawData || rawData.length === 0) {
         document.getElementById('indexChart').innerHTML = '<div class="text-center text-muted p-10">No data available for selected range.</div>';
         return;
     }
@@ -198,6 +199,26 @@
         };
     });
 
+    // ADX (Yellow)
+    const adxData = rawData.map(d => {
+        const date = new Date(d.timestamp);
+        const label = date.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        return {
+            x: label,
+            y: d.adx
+        };
+    });
+
+    // ATR (Green)
+    const atrData = rawData.map(d => {
+        const date = new Date(d.timestamp);
+        const label = date.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        return {
+            x: label,
+            y: d.atr
+        };
+    });
+
     var options = {
         series: [{
             name: 'KLine',
@@ -211,18 +232,32 @@
             name: 'MA 200',
             type: 'line',
             data: ma200Data
+        }, {
+            name: 'ADX',
+            type: 'line',
+            data: adxData
+        }, {
+            name: 'ATR',
+            type: 'line',
+            data: atrData
         }],
         chart: {
-            type: 'candlestick',
+            type: 'line', // Changed to line to support mixed types better, though candlestick works too
             height: 600,
             background: '#111827', // Dark bg
             animations: { enabled: false },
             toolbar: { show: true }
         },
-        colors: ['#00E396', '#FF4560', '#008FFB'], // Candle (Green/Red handled by plotOptions), MA20 (Red), MA200 (Blue)
+        colors: ['#00E396', '#FF4560', '#008FFB', '#FEB019', '#00E396'], // Candle, MA20(Red), MA200(Blue), ADX(Yellow), ATR(Green)
         stroke: {
-            width: [1, 2, 2],
-            curve: 'smooth'
+            width: [1, 2, 2, 2, 2],
+            curve: 'smooth',
+            connectNulls: true,
+            opacity: [1, 1, 1, 0.4, 0.4] // 60% transparency for ADX (idx 3) and ATR (idx 4)
+        },
+        fill: {
+            type: 'solid',
+            opacity: [1, 1, 1, 0.4, 0.4]
         },
         plotOptions: {
             candlestick: {
@@ -240,15 +275,36 @@
             axisBorder: { show: false },
             axisTicks: { show: false }
         },
-        yaxis: {
-            tooltip: { enabled: true },
-            labels: {
-                style: { colors: '#9ca3af' },
-                formatter: function (val) {
-                    return val.toFixed(2);
-                }
+        yaxis: [
+            {
+                seriesName: 'KLine',
+                axisTicks: { show: true },
+                axisBorder: { show: true, color: '#00E396' },
+                labels: { style: { colors: '#00E396' }, formatter: (val) => (typeof val === 'number') ? val.toFixed(2) : '' },
+                title: { text: "Price", style: { color: '#00E396' } },
+                tooltip: { enabled: true }
+            },
+            {
+                seriesName: 'KLine',
+                show: false // MA 20 shares Price axis
+            },
+            {
+                seriesName: 'KLine',
+                show: false // MA 200 shares Price axis
+            },
+            {
+                seriesName: 'ADX',
+                opposite: true,
+                axisTicks: { show: true },
+                axisBorder: { show: true, color: '#FEB019' },
+                labels: { style: { colors: '#FEB019' }, formatter: (val) => (typeof val === 'number') ? val.toFixed(2) : '' },
+                title: { text: "ADX / ATR", style: { color: '#FEB019' } }
+            },
+            {
+                seriesName: 'ADX',
+                show: false // ATR shares ADX axis (approx range)
             }
-        },
+        ],
         grid: {
             borderColor: '#374151',
             strokeDashArray: 4,
@@ -265,13 +321,15 @@
 
                 // Update Footer values dynamically
                 const footer = document.getElementById('indicator-values');
-                footer.innerHTML = `
-                        <span class="text-gray-300">Date: ${new Date(d.timestamp).toLocaleString()}</span>
-                        <span class="text-green-400">ATR: ${d.atr?.toFixed(2) || '-'}</span>
-                        <span class="text-yellow-400">ADX: ${d.adx?.toFixed(2) || '-'}</span>
-                        <span class="text-red-400">MA20: ${d.ma_20?.toFixed(2) || '-'}</span>
-                        <span class="text-blue-400">MA200: ${d.ma_200?.toFixed(2) || '-'}</span>
-                    `;
+                if (footer) {
+                    footer.innerHTML = `
+                                <span class="text-gray-300">Date: ${new Date(d.timestamp).toLocaleString()}</span>
+                                <span class="text-green-400">ATR: ${d.atr?.toFixed(2) || '-'}</span>
+                                <span class="text-yellow-400">ADX: ${d.adx?.toFixed(2) || '-'}</span>
+                                <span class="text-red-400">MA20: ${d.ma_20?.toFixed(2) || '-'}</span>
+                                <span class="text-blue-400">MA200: ${d.ma_200?.toFixed(2) || '-'}</span>
+                            `;
+                }
 
                 // Return standard tooltip for chart
                 return '' +
@@ -296,6 +354,15 @@
 
     var chart = new ApexCharts(document.querySelector("#indexChart"), options);
     chart.render();
+        } catch (e) {
+        console.error("Chart Error:", e);
+        document.getElementById('indexChart').innerHTML = '<div class="alert alert-danger">Chart Logic Error: ' + e.message + '</div>';
+    }
     });
+
+    // Auto Refresh every 60 seconds
+    setTimeout(function () {
+        window.location.reload();
+    }, 60000);
 </script>
 {% endblock %}

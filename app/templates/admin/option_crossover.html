@@ -66,6 +66,81 @@
             <canvas id="crossoverChart" height="500"></canvas>
         </div>
     </div>
+
+    <!-- Data Table -->
+    <div class="card mt-4">
+        <div class="card-header flex-row items-center justify-between">
+            <h3 class="font-bold">Minute-wise Data</h3>
+            <button onclick="exportTableToCSV('crossover_data.csv')" class="btn btn-sm btn-success">
+                Export CSV
+            </button>
+        </div>
+        <div class="card-body p-0 overflow-auto" style="max-height: 500px;">
+            <table class="table table-sm table-striped mb-0" id="crossoverTable">
+                <thead class="sticky-top bg-light">
+                    <tr>
+                        <th>Time</th>
+                        <th>CE OI Total</th>
+                        <th>CE Change (Cum)</th>
+                        <th>PE OI Total</th>
+                        <th>PE Change (Cum)</th>
+                        <th>Price</th>
+                        <th>Price Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in chart_data %}
+                    <tr>
+                        <td>{{ row.time }}</td>
+                        <td>{{ "{:,.0f}".format(row.ce_oi) }}</td>
+                        <td class="{{ 'text-success' if row.ce_change > 0 else 'text-danger' }}">
+                            {{ "{:+,.0f}".format(row.ce_change) }}
+                        </td>
+                        <td>{{ "{:,.0f}".format(row.pe_oi) }}</td>
+                        <td class="{{ 'text-success' if row.pe_change > 0 else 'text-danger' }}">
+                            {{ "{:+,.0f}".format(row.pe_change) }}
+                        </td>
+                        <td>{{ row.get('price', 0) }}</td>
+                        <td class="{{ 'text-success' if row.nifty_change > 0 else 'text-danger' }}">
+                            {{ "{:+.2f}".format(row.nifty_change) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function exportTableToCSV(filename) {
+            var csv = [];
+            var rows = document.querySelectorAll("table#crossoverTable tr");
+
+            for (var i = 0; i < rows.length; i++) {
+                var row = [], cols = rows[i].querySelectorAll("td, th");
+
+                for (var j = 0; j < cols.length; j++)
+                    row.push(cols[j].innerText.replace(/,/g, "")); // Remove commas for numbers
+
+                csv.push(row.join(","));
+            }
+
+            downloadCSV(csv.join("\n"), filename);
+        }
+
+        function downloadCSV(csv, filename) {
+            var csvFile;
+            var downloadLink;
+
+            csvFile = new Blob([csv], { type: "text/csv" });
+            downloadLink = document.createElement("a");
+            downloadLink.download = filename;
+            downloadLink.href = window.URL.createObjectURL(csvFile);
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+        }
+    </script>
 </div>
 
 <!-- Chart.js -->
@@ -97,11 +172,12 @@
             labels: labels,
             datasets: [
                 // Total OI (Light Colors, Thin)
+                // Total OI (Light Colors, Thin, Transparent)
                 {
                     label: 'CE OI Total',
                     data: rawData.map(d => d.ce_oi),
-                    borderColor: '#ff6666', // Light Red
-                    backgroundColor: '#ff6666',
+                    borderColor: 'rgba(255, 102, 102, 0.5)', // Light Red 50%
+                    backgroundColor: 'rgba(255, 102, 102, 0.5)',
                     borderWidth: 1.5,
                     pointRadius: 0,
                     yAxisID: 'y_oi',
@@ -110,8 +186,8 @@
                 {
                     label: 'PE OI Total',
                     data: rawData.map(d => d.pe_oi),
-                    borderColor: '#66ff66', // Light Green
-                    backgroundColor: '#66ff66',
+                    borderColor: 'rgba(102, 255, 102, 0.5)', // Light Green 50%
+                    backgroundColor: 'rgba(102, 255, 102, 0.5)',
                     borderWidth: 1.5,
                     pointRadius: 0,
                     yAxisID: 'y_oi',
@@ -120,7 +196,7 @@
 
                 // OI Change (Dark Colors, Thick)
                 {
-                    label: 'CE OI Change',
+                    label: 'CE OI Change (Cum)',
                     data: rawData.map(d => d.ce_change),
                     borderColor: '#cc0000', // Dark Red
                     backgroundColor: '#cc0000',
@@ -134,17 +210,19 @@
                     // Usually traders view Change on separate scale or separate chart.
                     // I'll put Change on a 3rd axis or share with Nifty? No.
                     // I'll put OI Change on 'y_change' axis on RIGHT.
-                    tension: 0.1
+                    tension: 0.1,
+                    spanGaps: true // Connect nulls in Chart.js
                 },
                 {
-                    label: 'PE OI Change',
+                    label: 'PE OI Change (Cum)',
                     data: rawData.map(d => d.pe_change),
                     borderColor: '#00cc00', // Dark Green
                     backgroundColor: '#00cc00',
                     borderWidth: 3,
                     pointRadius: 0,
                     yAxisID: 'y_change',
-                    tension: 0.1
+                    tension: 0.1,
+                    spanGaps: true
                 },
 
                 // Nifty Price Change (Blue)
@@ -180,7 +258,12 @@
             },
             scales: {
                 x: {
-                    ticks: { color: '#ffffff' },
+                    ticks: {
+                        color: '#ffffff',
+                        autoSkip: true,
+                        maxTicksLimit: 20,
+                        maxRotation: 0
+                    },
                     grid: { color: 'rgba(255, 255, 255, 0.1)' } // Thin white grid
                 },
                 y_oi: {

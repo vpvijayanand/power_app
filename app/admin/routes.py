@@ -541,19 +541,21 @@ def option_crossover():
     # We need SUM(ce_oi), SUM(pe_oi), SUM(ce_change), SUM(pe_change) per timestamp
     # Filtering by Underlying, Expiry, and Date
     
-    option_query = db.session.query(
-        OptionChainData.timestamp,
-        func.sum(OptionChainData.ce_oi).label('ce_oi_total'),
-        func.sum(OptionChainData.pe_oi).label('pe_oi_total'),
-        func.sum(OptionChainData.ce_oi_change).label('ce_change_total'),
-        func.sum(OptionChainData.pe_oi_change).label('pe_change_total')
-    ).filter(
-        OptionChainData.underlying == underlying,
-        OptionChainData.expiry_date == expiry,
-        func.date(OptionChainData.timestamp) == query_date
-    ).group_by(OptionChainData.timestamp).order_by(OptionChainData.timestamp)
-    
-    option_data = option_query.all()
+    option_data = []
+    if expiry:
+        option_query = db.session.query(
+            OptionChainData.timestamp,
+            func.sum(OptionChainData.ce_oi).label('ce_oi_total'),
+            func.sum(OptionChainData.pe_oi).label('pe_oi_total'),
+            func.sum(OptionChainData.ce_oi_change).label('ce_change_total'),
+            func.sum(OptionChainData.pe_oi_change).label('pe_change_total')
+        ).filter(
+            OptionChainData.underlying == underlying,
+            OptionChainData.expiry_date == expiry,
+            func.date(OptionChainData.timestamp) == query_date
+        ).group_by(OptionChainData.timestamp).order_by(OptionChainData.timestamp)
+        
+        option_data = option_query.all()
     
     # 2. Fetch Index Data (Price)
     # Filter by Symbol (matches underlying) and Date
@@ -562,38 +564,54 @@ def option_crossover():
         func.date(IndexData.timestamp) == query_date
     ).order_by(IndexData.timestamp).all()
     
-    # 3. Merge Data ? Or pass separate arrays?
-    # Chart.js can handle separate datasets if labels (timestamps) match.
-    # Best to align them. Index data might be every minute. Option data might be every minute.
+    # 3. Merge and Calculate Cumulative Change
+    # To fix "jagged" graphs on restart, we calculate Change = Current Total OI - Open Total OI
+    # We find the 'Open Total OI' from the first record of the day.
     
-    # Let's create a dictionary by timestamp string to align
     data_map = {}
+    
+    # Base OIs
+    base_ce_oi = None
+    base_pe_oi = None
+    
+    if option_data:
+        # First record establishes the baseline (Open OI)
+        first_record = option_data[0]
+        base_ce_oi = first_record.ce_oi_total or 0
+        base_pe_oi = first_record.pe_oi_total or 0
     
     for row in option_data:
         ts = row.timestamp.strftime('%H:%M')
         if ts not in data_map:
             data_map[ts] = {}
+            
+        current_ce_oi = row.ce_oi_total or 0
+        current_pe_oi = row.pe_oi_total or 0
+        
+        # Calculate Change from Baseline
+        # If base is None (shouldn't happen if loop runs), use 0
+        ce_change = current_ce_oi - (base_ce_oi if base_ce_oi is not None else 0)
+        pe_change = current_pe_oi - (base_pe_oi if base_pe_oi is not None else 0)
+        
         data_map[ts].update({
-            'ce_oi': row.ce_oi_total,
-            'pe_oi': row.pe_oi_total,
-            'ce_change': row.ce_change_total,
-            'pe_change': row.pe_change_total
+            'ce_oi': current_ce_oi,
+            'pe_oi': current_pe_oi,
+            'ce_change': ce_change, 
+            'pe_change': pe_change
         })
         
-    # Index Data - Calculate Change? "Nifty one minute change graph"
-    # Change from Open? Or Change from Prev Close?
-    # "one minute change" implies Close - Open (body size) or Close - PrevClose (momentum).
-    # I'll use Close - Open for "intraday minute momentum".
-    
+    # Index Data processing
     for row in index_query:
         ts = row.timestamp.strftime('%H:%M')
         if ts not in data_map:
+            # If we have index data but no option data for this minute, we might want to show it?
+            # Chart.js can handle it if we fill with nulls or just omit option fields.
             data_map[ts] = {}
         
-        # Calculate change
+        # Calculate change (Price Momentum)
         change = row.close - row.open 
         data_map[ts]['price_change'] = change
-        data_map[ts]['price'] = row.close # Also keep absolute price if needed
+        data_map[ts]['price'] = row.close
         
     # Convert back to sorted list
     chart_data = []
@@ -601,15 +619,17 @@ def option_crossover():
     
     for ts in sorted_keys:
         item = data_map[ts]
-        # Only include if we have option data? Or include all?
-        # User wants crossover, so need both. But maybe some missing.
+        # Only include if we have at least one valid data point
+        if not item: 
+            continue
+            
         chart_data.append({
             'time': ts,
-            'ce_oi': item.get('ce_oi', 0),
-            'pe_oi': item.get('pe_oi', 0),
-            'ce_change': item.get('ce_change', 0),
-            'pe_change': item.get('pe_change', 0),
-            'nifty_change': item.get('price_change', 0)
+            'ce_oi': item.get('ce_oi') or 0,
+            'pe_oi': item.get('pe_oi') or 0,
+            'ce_change': item.get('ce_change') or 0,
+            'pe_change': item.get('pe_change') or 0,
+            'nifty_change': item.get('price_change') or 0
         })
 
     return render_template(

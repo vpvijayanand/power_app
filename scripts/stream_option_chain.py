@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # Key: (underlying, expiry, strike)
 # Value: dict with ce_data and pe_data
 option_chain_cache = {}
+initial_oi_map = {} # Token -> Initial OI
 cache_lock = threading.Lock()
 
 # Map instrument token to details for quick lookup
@@ -103,6 +104,7 @@ def get_option_instruments(engine):
 def on_ticks(ws, ticks):
     """Callback for tick data"""
     global option_chain_cache
+    global initial_oi_map
     
     with cache_lock:
         for tick in ticks:
@@ -113,6 +115,7 @@ def on_ticks(ws, ticks):
             details = token_map[token]
             key = (details['underlying'], details['expiry'], details['strike'])
             
+            # Initialize cache entry if missing
             if key not in option_chain_cache:
                 option_chain_cache[key] = {
                     'underlying': details['underlying'],
@@ -123,19 +126,28 @@ def on_ticks(ws, ticks):
                     'ce': {}, 'pe': {}
                 }
             
+            # Handle Initial OI for Change Calculation
+            current_oi = tick.get('oi', 0)
+            if token not in initial_oi_map:
+                initial_oi_map[token] = current_oi
+                
+            # Calculate OI Change (from script start)
+            initial_oi = initial_oi_map[token]
+            oi_change = current_oi - initial_oi
+            
             # Extract data
             data = {
-                'oi': tick.get('oi', 0),
-                'oi_change': 0, # Kite ticker doesn't send OI change directly in mode_full? verify
+                'oi': current_oi,
+                'oi_change': oi_change,
                 'volume': tick.get('volume_traded', 0),
                 'ltp': tick.get('last_price', 0),
-                'change': tick.get('change', 0), # Absolute change not guaranteed, mostly % change is sent or calculated
+                'change': tick.get('change', 0), 
                 'change_percent': 0, # Calculate later
                 'token': token,
                 'symbol': details['symbol']
             }
             
-            # Calculate change and percent if ohlc is available
+            # Calculate change and percent for PRICE if ohlc is available
             if 'ohlc' in tick:
                 close_price = tick['ohlc']['close']
                 if close_price > 0:
@@ -167,7 +179,11 @@ def db_updater(engine):
     """Background thread to flush cache to DB"""
     logger.info("Starting DB updater thread...")
     while True:
-        time.sleep(1) # Update frequency
+        # Wait for the next minute start to align data?
+        # Or just sleep 60s. Aligning is better for "1 minute" charts.
+        now = datetime.now()
+        seconds_to_wait = 60 - now.second
+        time.sleep(seconds_to_wait)
         
         try:
             with cache_lock:
@@ -175,14 +191,14 @@ def db_updater(engine):
                     continue
                 
                 snapshot = option_chain_cache.copy()
-                # We don't clear the cache because we want latest state for creating full rows
-                # But for upsert, maybe we only want changed rows? 
-                # For now, let's just upsert everything we have seen so far
                 
             if not snapshot:
                 continue
                 
             # Prepare batch data
+            # USE SINGLE TIMESTAMP FOR ALL ROWS IN BATCH
+            batch_timestamp = datetime.now().replace(second=0, microsecond=0)
+            
             rows = []
             for key, data in snapshot.items():
                 ce = data['ce']
@@ -193,11 +209,12 @@ def db_updater(engine):
                     'underlying': data['underlying'],
                     'strike_price': data['strike_price'],
                     'expiry_date': data['expiry_date'],
-                    'timestamp': datetime.now(),
+                    'timestamp': batch_timestamp,
                     'is_current_expiry': data['is_current_expiry'],
                     
                     # CE Data
                     'ce_oi': ce.get('oi'),
+                    'ce_oi_change': ce.get('oi_change'),
                     'ce_volume': ce.get('volume'),
                     'ce_ltp': ce.get('ltp'),
                     'ce_change': ce.get('change'),
@@ -207,6 +224,7 @@ def db_updater(engine):
                     
                     # PE Data
                     'pe_oi': pe.get('oi'),
+                    'pe_oi_change': pe.get('oi_change'),
                     'pe_volume': pe.get('volume'),
                     'pe_ltp': pe.get('ltp'),
                     'pe_change': pe.get('change'),
@@ -273,12 +291,12 @@ def db_updater(engine):
                     text("""
                     INSERT INTO option_chain_data (
                         underlying, strike_price, expiry_date, timestamp, is_current_expiry,
-                        ce_oi, ce_volume, ce_ltp, ce_change, ce_change_percent, ce_strike_symbol, ce_instrument_token,
-                        pe_oi, pe_volume, pe_ltp, pe_change, pe_change_percent, pe_strike_symbol, pe_instrument_token
+                        ce_oi, ce_oi_change, ce_volume, ce_ltp, ce_change, ce_change_percent, ce_strike_symbol, ce_instrument_token,
+                        pe_oi, pe_oi_change, pe_volume, pe_ltp, pe_change, pe_change_percent, pe_strike_symbol, pe_instrument_token
                     ) VALUES (
                         :underlying, :strike_price, :expiry_date, :timestamp, :is_current_expiry,
-                        :ce_oi, :ce_volume, :ce_ltp, :ce_change, :ce_change_percent, :ce_strike_symbol, :ce_instrument_token,
-                        :pe_oi, :pe_volume, :pe_ltp, :pe_change, :pe_change_percent, :pe_strike_symbol, :pe_instrument_token
+                        :ce_oi, :ce_oi_change, :ce_volume, :ce_ltp, :ce_change, :ce_change_percent, :ce_strike_symbol, :ce_instrument_token,
+                        :pe_oi, :pe_oi_change, :pe_volume, :pe_ltp, :pe_change, :pe_change_percent, :pe_strike_symbol, :pe_instrument_token
                     )
                     """),
                     rows
