@@ -1,4 +1,4 @@
-from flask import redirect, url_for, flash, request, render_template
+from flask import redirect, url_for, flash, request, render_template, current_app
 from app.auth.decorators import login_required, get_current_user
 from app.services.kite_service import KiteService
 from app.models import User, db
@@ -84,7 +84,8 @@ def credentials():
         else:
             flash('Please provide both API key and secret.', 'danger')
     
-    return render_template('kite/credentials.html', user=user, current_user=user)
+    return render_template('kite/credentials.html', user=user, current_user=user,
+                           callback_base_url=current_app.config['KITE_CALLBACK_BASE_URL'])
 
 
 @kite_bp.route('/refresh-balance')
