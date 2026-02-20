@@ -162,3 +162,62 @@ class IndexData(db.Model):
 
     def __repr__(self):
         return f'<IndexData {self.symbol} {self.timestamp}>'
+
+
+class UserTrade(db.Model):
+    """User trade model for manual trading"""
+    __tablename__ = 'user_trades'
+
+    id = db.Column(db.Integer, primary_key=True)
+    trade_date = db.Column(db.Date, nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+
+    # Instrument
+    nifty_price = db.Column(db.Float)
+    trade_symbol = db.Column(db.String(100), nullable=False)
+    trade_instrument_token = db.Column(db.BigInteger)
+    option_type = db.Column(db.String(5), nullable=False)  # CE or PE
+    strike_price = db.Column(db.Float)
+    expiry_date = db.Column(db.Date)
+
+    # Entry
+    entry_time = db.Column(db.DateTime, nullable=False)
+    entry_price = db.Column(db.Float, nullable=False)
+    actual_entry_price = db.Column(db.Float)
+    lot_size = db.Column(db.Integer)
+    quantity = db.Column(db.Integer, nullable=False)
+    trade_type = db.Column(db.String(10), nullable=False, default='BUY')
+
+    # Exit
+    exit_time = db.Column(db.DateTime)
+    exit_price = db.Column(db.Float)
+    actual_exit_price = db.Column(db.Float)
+
+    # Status
+    trade_status = db.Column(db.String(20), nullable=False, default='OPEN', index=True)
+    trade_mode = db.Column(db.String(20), nullable=False)  # LIVE or PAPER
+
+    # Kite Order IDs
+    kite_order_id_entry = db.Column(db.String(50))
+    kite_order_id_exit = db.Column(db.String(50))
+
+    # OI Analytics
+    oi_trend = db.Column(db.String(50))
+    avg_oi_change_5min = db.Column(db.Float)
+
+    # PnL
+    capital_used = db.Column(db.Float)
+    closing_pnl = db.Column(db.Float)
+    pnl_percentage = db.Column(db.Float)
+    max_pnl = db.Column(db.Float)
+    min_pnl = db.Column(db.Float)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationship
+    user = db.relationship('User', backref=db.backref('trades', lazy='dynamic'))
+
+    def __repr__(self):
+        return f'<UserTrade {self.trade_symbol} {self.user_id} {self.trade_status}>'

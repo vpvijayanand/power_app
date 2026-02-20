@@ -510,6 +510,10 @@ def option_crossover():
         query_date = datetime.now().date()
         date_str = query_date.strftime('%Y-%m-%d')
 
+    # Market hours boundaries (9:15 AM to 3:30 PM)
+    market_open = datetime.combine(query_date, datetime.strptime('09:15', '%H:%M').time())
+    market_close = datetime.combine(query_date, datetime.strptime('15:30', '%H:%M').time())
+
     # Get Filters
     underlyings = db.session.query(OptionChainData.underlying).distinct().order_by(OptionChainData.underlying).all()
     expiries = db.session.query(OptionChainData.expiry_date).filter(
@@ -539,7 +543,7 @@ def option_crossover():
 
     # 1. Fetch Option Chain Data (Aggregated by Timestamp)
     # We need SUM(ce_oi), SUM(pe_oi), SUM(ce_change), SUM(pe_change) per timestamp
-    # Filtering by Underlying, Expiry, and Date
+    # Filtering by Underlying, Expiry, Date, and Market Hours (9:15 - 15:30)
     
     option_data = []
     if expiry:
@@ -552,16 +556,20 @@ def option_crossover():
         ).filter(
             OptionChainData.underlying == underlying,
             OptionChainData.expiry_date == expiry,
-            func.date(OptionChainData.timestamp) == query_date
+            func.date(OptionChainData.timestamp) == query_date,
+            OptionChainData.timestamp >= market_open,
+            OptionChainData.timestamp <= market_close
         ).group_by(OptionChainData.timestamp).order_by(OptionChainData.timestamp)
         
         option_data = option_query.all()
     
     # 2. Fetch Index Data (Price)
-    # Filter by Symbol (matches underlying) and Date
+    # Filter by Symbol (matches underlying), Date, and Market Hours (9:15 - 15:30)
     index_query = IndexData.query.filter(
         IndexData.symbol == underlying,
-        func.date(IndexData.timestamp) == query_date
+        func.date(IndexData.timestamp) == query_date,
+        IndexData.timestamp >= market_open,
+        IndexData.timestamp <= market_close
     ).order_by(IndexData.timestamp).all()
     
     # 3. Merge and Calculate Cumulative Change
@@ -604,8 +612,6 @@ def option_crossover():
     for row in index_query:
         ts = row.timestamp.strftime('%H:%M')
         if ts not in data_map:
-            # If we have index data but no option data for this minute, we might want to show it?
-            # Chart.js can handle it if we fill with nulls or just omit option fields.
             data_map[ts] = {}
         
         # Calculate change (Price Momentum)
@@ -613,11 +619,15 @@ def option_crossover():
         data_map[ts]['price_change'] = change
         data_map[ts]['price'] = row.close
         
-    # Convert back to sorted list
+    # Convert back to sorted list (only market hours 09:15 - 15:30)
     chart_data = []
     sorted_keys = sorted(data_map.keys())
     
     for ts in sorted_keys:
+        # Extra safety: skip any timestamps outside market hours
+        if ts < '09:15' or ts > '15:30':
+            continue
+
         item = data_map[ts]
         # Only include if we have at least one valid data point
         if not item: 

@@ -48,6 +48,14 @@
                         </div>
                     </li>
 
+                    <!-- Trade Dropdown -->
+                    <li class="dropdown">
+                        <a href="#" class="navbar-link dropdown-toggle">Trade ▾</a>
+                        <div class="dropdown-menu">
+                            <a href="{{ url_for('trade.manual_trade') }}" class="dropdown-item">Manual Trade</a>
+                        </div>
+                    </li>
+
                     <li><a href="{{ url_for('auth.register') }}" class="navbar-link">Add User</a></li>
                     <li><a href="{{ url_for('kite.credentials') }}" class="navbar-link">Kite Settings</a></li>
                     {% else %}

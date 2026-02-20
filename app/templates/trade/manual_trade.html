@@ -1,0 +1,1028 @@
+{% extends "base.html" %}
+
+{% block title %}Manual Trade - Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ===== Manual Trade Page Styles ===== */
+    .trade-page {
+        margin-top: 1.5rem;
+        max-width: 1600px;
+        margin-left: auto;
+        margin-right: auto;
+        padding: 0 1.5rem;
+    }
+
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--accent-blue);
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Spot Banner */
+    .spot-banner {
+        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 1rem 1.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+    }
+
+    .spot-banner .spot-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #58a6ff;
+        text-shadow: 0 0 20px rgba(88, 166, 255, 0.4);
+    }
+
+    .spot-banner .spot-label {
+        font-size: 0.85rem;
+        color: #8b949e;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .spot-banner .user-count {
+        background: rgba(0, 255, 136, 0.1);
+        border: 1px solid rgba(0, 255, 136, 0.3);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .spot-banner .user-count .count {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #00ff88;
+    }
+
+    .spot-banner .user-count .label {
+        font-size: 0.75rem;
+        color: #8b949e;
+    }
+
+    /* Selection Grid */
+    .selection-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    @media(max-width:1024px) {
+        .selection-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+
+    /* Option Type Toggle */
+    .opt-toggle {
+        display: flex;
+        gap: 0;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #30363d;
+    }
+
+    .opt-toggle .opt-btn {
+        flex: 1;
+        padding: 0.75rem 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 1rem;
+        border: none;
+        background: #0d1117;
+        color: #8b949e;
+        transition: all 0.25s;
+    }
+
+    .opt-toggle .opt-btn.active-ce {
+        background: linear-gradient(135deg, #ff4444 0%, #cc0000 100%);
+        color: #fff;
+        box-shadow: 0 0 15px rgba(255, 68, 68, 0.4);
+    }
+
+    .opt-toggle .opt-btn.active-pe {
+        background: linear-gradient(135deg, #00cc66 0%, #009944 100%);
+        color: #fff;
+        box-shadow: 0 0 15px rgba(0, 204, 102, 0.4);
+    }
+
+    .opt-toggle .opt-btn:hover:not(.active-ce):not(.active-pe) {
+        background: #161b22;
+        color: #fff;
+    }
+
+    /* OI Info Panel */
+    .oi-panel {
+        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .oi-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 1rem;
+    }
+
+    @media(max-width:1024px) {
+        .oi-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    .oi-stat {
+        text-align: center;
+    }
+
+    .oi-stat .value {
+        font-size: 1.4rem;
+        font-weight: 700;
+    }
+
+    .oi-stat .label {
+        font-size: 0.75rem;
+        color: #8b949e;
+        text-transform: uppercase;
+        margin-top: 0.25rem;
+    }
+
+    .direction-badge {
+        display: inline-block;
+        padding: 0.4rem 1rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+
+    .dir-long-buildup {
+        background: rgba(0, 255, 136, 0.15);
+        color: #00ff88;
+        border: 1px solid rgba(0, 255, 136, 0.3);
+    }
+
+    .dir-short-buildup {
+        background: rgba(255, 0, 85, 0.15);
+        color: #ff0055;
+        border: 1px solid rgba(255, 0, 85, 0.3);
+    }
+
+    .dir-short-covering {
+        background: rgba(0, 170, 255, 0.15);
+        color: #00aaff;
+        border: 1px solid rgba(0, 170, 255, 0.3);
+    }
+
+    .dir-long-unwinding {
+        background: rgba(255, 215, 0, 0.15);
+        color: #ffd700;
+        border: 1px solid rgba(255, 215, 0, 0.3);
+    }
+
+    .dir-no-data {
+        background: rgba(139, 148, 158, 0.15);
+        color: #8b949e;
+        border: 1px solid rgba(139, 148, 158, 0.3);
+    }
+
+    /* Action Buttons */
+    .action-row {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-buy {
+        background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+        color: #000;
+        font-weight: 700;
+        font-size: 1.1rem;
+        padding: 0.85rem 2.5rem;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .btn-buy:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+    }
+
+    .btn-buy:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .btn-sell {
+        background: linear-gradient(135deg, #ff0055 0%, #cc0044 100%);
+        color: #fff;
+        font-weight: 700;
+        font-size: 1.1rem;
+        padding: 0.85rem 2.5rem;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 0 20px rgba(255, 0, 85, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .btn-sell:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 0 30px rgba(255, 0, 85, 0.5);
+    }
+
+    .btn-sell:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    /* Result Toast */
+    .result-toast {
+        display: none;
+        padding: 1rem 1.5rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+        animation: slideIn 0.3s ease;
+    }
+
+    .result-toast.show {
+        display: block;
+    }
+
+    .result-toast.success {
+        background: rgba(0, 255, 136, 0.1);
+        border: 1px solid rgba(0, 255, 136, 0.3);
+        color: #00ff88;
+    }
+
+    .result-toast.error {
+        background: rgba(255, 0, 85, 0.1);
+        border: 1px solid rgba(255, 0, 85, 0.3);
+        color: #ff0055;
+    }
+
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Tabs */
+    .tab-bar {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid #30363d;
+        margin-bottom: 1rem;
+    }
+
+    .tab-btn {
+        padding: 0.75rem 1.5rem;
+        background: none;
+        border: none;
+        color: #8b949e;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.25s;
+    }
+
+    .tab-btn.active {
+        color: #58a6ff;
+        border-bottom-color: #58a6ff;
+    }
+
+    .tab-btn:hover:not(.active) {
+        color: #c9d1d9;
+    }
+
+    /* Table compact */
+    .trade-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+    }
+
+    .trade-table thead {
+        background: #0d1117;
+    }
+
+    .trade-table th {
+        padding: 0.6rem 0.75rem;
+        text-align: left;
+        color: #58a6ff;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #30363d;
+    }
+
+    .trade-table td {
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid #21262d;
+        color: #c9d1d9;
+    }
+
+    .trade-table tbody tr:hover {
+        background: #161b22;
+    }
+
+    .pnl-pos {
+        color: #00ff88;
+        font-weight: 600;
+    }
+
+    .pnl-neg {
+        color: #ff0055;
+        font-weight: 600;
+    }
+
+    /* Filter Row */
+    .filter-row {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+        align-items: flex-end;
+    }
+
+    .filter-row .form-group {
+        margin-bottom: 0;
+    }
+
+    .filter-row .form-control {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.85rem;
+    }
+
+    .filter-row label {
+        font-size: 0.75rem;
+        margin-bottom: 0.25rem;
+    }
+
+    /* Pagination */
+    .pagination {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        margin-top: 1rem;
+    }
+
+    .page-btn {
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+        background: #0d1117;
+        color: #8b949e;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+
+    .page-btn.active {
+        background: #58a6ff;
+        color: #000;
+        border-color: #58a6ff;
+    }
+
+    .page-btn:hover:not(.active) {
+        background: #161b22;
+        color: #fff;
+    }
+
+    /* Spinner */
+    .spinner {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        vertical-align: middle;
+        margin-right: 6px;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .refresh-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #00ff88;
+        margin-left: 6px;
+        animation: blinker 2s linear infinite;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="trade-page">
+    <!-- Spot Banner -->
+    <div class="spot-banner">
+        <div>
+            <div class="spot-label">{{ underlying }} Spot Price</div>
+            <div class="spot-value" id="spotPrice">{{ "%.2f"|format(spot) }}</div>
+        </div>
+        <div style="display: flex; gap: 1.5rem; align-items: center;">
+            <div class="user-count">
+                <div class="count">{{ active_users }}</div>
+                <div class="label">Active Users</div>
+            </div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline btn-sm">← Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Selection Section -->
+    <div class="card mb-2">
+        <div class="card-body">
+            <div class="section-title">Trade Setup</div>
+            <div class="selection-grid">
+                <!-- Expiry -->
+                <div class="form-group">
+                    <label class="form-label">Expiry</label>
+                    <select id="expirySelect" class="form-control">
+                        {% for e in expiries %}
+                        <option value="{{ e }}" {% if expiry==e|string %}selected{% endif %}>{{ e.strftime('%d %b %Y')
+                            }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- Option Type -->
+                <div class="form-group">
+                    <label class="form-label">Option Type</label>
+                    <div class="opt-toggle">
+                        <button class="opt-btn active-ce" id="btnCE" onclick="setOptionType('CE')">CE</button>
+                        <button class="opt-btn" id="btnPE" onclick="setOptionType('PE')">PE</button>
+                    </div>
+                </div>
+                <!-- Strike -->
+                <div class="form-group">
+                    <label class="form-label">Strike Price</label>
+                    <select id="strikeSelect" class="form-control">
+                        {% for s in strikes %}
+                        <option value="{{ s }}" {% if s|int==itm_ce|int %}selected{% endif %}>{{ "%.0f"|format(s) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- LTP -->
+                <div class="form-group">
+                    <label class="form-label">LTP</label>
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #ffd700; padding-top: 0.25rem;"
+                        id="ltpDisplay">—</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OI Info Panel -->
+    <div class="oi-panel" id="oiPanel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div class="section-title" style="margin-bottom:0;">OI Intelligence <span class="refresh-dot"></span></div>
+            <span style="font-size:0.75rem; color:#8b949e;">Auto-refresh 30s</span>
+        </div>
+        <div class="oi-grid">
+            <div class="oi-stat">
+                <div class="value text-white" id="oiCurrent">—</div>
+                <div class="label">Current OI</div>
+            </div>
+            <div class="oi-stat">
+                <div class="value" id="oiChangePct">—</div>
+                <div class="label">5-Min OI % Change</div>
+            </div>
+            <div class="oi-stat">
+                <div class="value text-white" id="oiAvg">—</div>
+                <div class="label">Avg OI Change (5m)</div>
+            </div>
+            <div class="oi-stat">
+                <div class="value" id="ceOiPct">—</div>
+                <div class="label">CE OI Change %</div>
+            </div>
+            <div class="oi-stat">
+                <div class="value" id="peOiPct">—</div>
+                <div class="label">PE OI Change %</div>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 1rem;">
+            <span class="direction-badge dir-no-data" id="oiDirection">WAITING...</span>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-row">
+        <button class="btn-buy" id="btnBuy" onclick="placeBuy()">
+            ⚡ BUY ALL USERS
+        </button>
+        <button class="btn-sell" id="btnSell" onclick="placeSell()">
+            🔴 SELL ALL (EXIT)
+        </button>
+    </div>
+
+    <!-- Result Toast -->
+    <div class="result-toast" id="resultToast"></div>
+
+    <!-- Open Trades -->
+    <div class="card mb-2">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 class="section-title" style="margin-bottom:0;">Active Open Orders</h3>
+            <span style="font-size:0.8rem; color:#8b949e;" id="openCount">{{ open_trades|length }} trades</span>
+        </div>
+        <div class="card-body" style="padding:0; overflow-x:auto;">
+            <table class="trade-table" id="openTradesTable">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
+                        <th>Entry Time</th>
+                        <th>Entry Price</th>
+                        <th>Qty</th>
+                        <th>Mode</th>
+                        <th>OI Trend</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in open_trades %}
+                    <tr>
+                        <td>{{ t.user.name }}</td>
+                        <td>{{ t.trade_symbol }}</td>
+                        <td>{{ t.option_type }}</td>
+                        <td>{{ t.entry_time.strftime('%H:%M:%S') }}</td>
+                        <td>₹{{ "%.2f"|format(t.entry_price) }}</td>
+                        <td>{{ t.quantity }}</td>
+                        <td><span class="badge {{ 'badge-success' if t.trade_mode == 'Live' else 'badge-warning' }}">{{
+                                t.trade_mode }}</span></td>
+                        <td>{{ t.oi_trend or '—' }}</td>
+                        <td><span class="badge badge-info">{{ t.trade_status }}</span></td>
+                    </tr>
+                    {% endfor %}
+                    {% if not open_trades %}
+                    <tr>
+                        <td colspan="9" style="text-align:center; color:#8b949e; padding:2rem;">No open trades</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Latest Closed -->
+    <div class="card mb-2">
+        <div class="card-header">
+            <h3 class="section-title" style="margin-bottom:0;">Latest Closed Orders</h3>
+        </div>
+        <div class="card-body" style="padding:0; overflow-x:auto;">
+            <table class="trade-table">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Entry Price</th>
+                        <th>Exit Price</th>
+                        <th>PnL</th>
+                        <th>%</th>
+                        <th>Mode</th>
+                        <th>Exit Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in closed_trades %}
+                    <tr>
+                        <td>{{ t.user.name }}</td>
+                        <td>₹{{ "%.2f"|format(t.entry_price) }}</td>
+                        <td>₹{{ "%.2f"|format(t.exit_price or 0) }}</td>
+                        <td class="{{ 'pnl-pos' if (t.closing_pnl or 0) >= 0 else 'pnl-neg' }}">
+                            ₹{{ "%.2f"|format(t.closing_pnl or 0) }}
+                        </td>
+                        <td class="{{ 'pnl-pos' if (t.pnl_percentage or 0) >= 0 else 'pnl-neg' }}">
+                            {{ "%.2f"|format(t.pnl_percentage or 0) }}%
+                        </td>
+                        <td><span class="badge {{ 'badge-success' if t.trade_mode == 'Live' else 'badge-warning' }}">{{
+                                t.trade_mode }}</span></td>
+                        <td>{{ t.exit_time.strftime('%H:%M:%S') if t.exit_time else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not closed_trades %}
+                    <tr>
+                        <td colspan="7" style="text-align:center; color:#8b949e; padding:2rem;">No closed trades yet
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Order History Tabs -->
+    <div class="card mb-2">
+        <div class="card-header">
+            <h3 class="section-title" style="margin-bottom:0;">Order History</h3>
+        </div>
+        <div class="card-body">
+            <!-- Tabs -->
+            <div class="tab-bar">
+                <button class="tab-btn active" data-tab="open" onclick="switchTab('open', this)">Open Orders</button>
+                <button class="tab-btn" data-tab="closed" onclick="switchTab('closed', this)">Closed Orders</button>
+                <button class="tab-btn" data-tab="all" onclick="switchTab('all', this)">All Orders</button>
+            </div>
+            <!-- Filters -->
+            <div class="filter-row">
+                <div class="form-group">
+                    <label class="form-label">From</label>
+                    <input type="date" class="form-control" id="filterDateFrom"
+                        value="{{ import('datetime').date.today().isoformat() if false else '' }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">To</label>
+                    <input type="date" class="form-control" id="filterDateTo">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">User</label>
+                    <select class="form-control" id="filterUser">
+                        <option value="">All Users</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select class="form-control" id="filterOptionType">
+                        <option value="">All</option>
+                        <option value="CE">CE</option>
+                        <option value="PE">PE</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Mode</label>
+                    <select class="form-control" id="filterTradeMode">
+                        <option value="">All</option>
+                        <option value="Live">Live</option>
+                        <option value="Paper">Paper</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-primary btn-sm" onclick="loadOrders(1)">Apply</button>
+                </div>
+            </div>
+            <!-- Orders Table -->
+            <div style="overflow-x:auto;">
+                <table class="trade-table" id="historyTable">
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Symbol</th>
+                            <th>Type</th>
+                            <th>Entry Time</th>
+                            <th>Entry Price</th>
+                            <th>Exit Time</th>
+                            <th>Exit Price</th>
+                            <th>Qty</th>
+                            <th>Mode</th>
+                            <th>OI Trend</th>
+                            <th>PnL</th>
+                            <th>%</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody">
+                        <tr>
+                            <td colspan="13" style="text-align:center; color:#8b949e; padding:2rem;">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination -->
+            <div class="pagination" id="historyPagination"></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        // ===== State =====
+        let optionType = 'CE';
+        let currentTab = 'open';
+        let oiTimer = null;
+
+        // ===== Expose to global for inline onclick =====
+        window.setOptionType = function (type) {
+            optionType = type;
+            const btnCE = document.getElementById('btnCE');
+            const btnPE = document.getElementById('btnPE');
+            btnCE.className = 'opt-btn' + (type === 'CE' ? ' active-ce' : '');
+            btnPE.className = 'opt-btn' + (type === 'PE' ? ' active-pe' : '');
+            // Reset strike to ITM
+            updateDefaultStrike();
+            refreshOI();
+        };
+
+        window.switchTab = function (tab, btn) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            loadOrders(1);
+        };
+
+        window.placeBuy = placeBuy;
+        window.placeSell = placeSell;
+        window.loadOrders = loadOrders;
+
+        // ===== Init =====
+        document.addEventListener('DOMContentLoaded', function () {
+            // Listeners
+            document.getElementById('expirySelect').addEventListener('change', onExpiryChange);
+            document.getElementById('strikeSelect').addEventListener('change', refreshOI);
+
+            refreshOI();
+            loadOrders(1);
+
+            // Auto-refresh OI every 30s
+            oiTimer = setInterval(refreshOI, 30000);
+        });
+
+        // ===== Expiry Change → reload strikes =====
+        function onExpiryChange() {
+            const expiry = document.getElementById('expirySelect').value;
+            fetch(`/admin/trade/manual/strikes?expiry=${expiry}&underlying=NIFTY`)
+                .then(r => r.json())
+                .then(data => {
+                    const sel = document.getElementById('strikeSelect');
+                    sel.innerHTML = '';
+                    const itm = optionType === 'CE' ? data.itm_ce : data.itm_pe;
+                    (data.strikes || []).forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s;
+                        opt.textContent = s;
+                        if (s == itm) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                    refreshOI();
+                });
+        }
+
+        function updateDefaultStrike() {
+            // Select ITM strike for current option type
+            const sel = document.getElementById('strikeSelect');
+            const spot = parseFloat(document.getElementById('spotPrice').textContent) || 0;
+            if (!spot) return;
+            const options = Array.from(sel.options);
+            let best = null;
+            let bestDiff = Infinity;
+            options.forEach(o => {
+                const s = parseFloat(o.value);
+                if (optionType === 'CE' && s <= spot) {
+                    if (spot - s < bestDiff) { bestDiff = spot - s; best = o; }
+                } else if (optionType === 'PE' && s >= spot) {
+                    if (s - spot < bestDiff) { bestDiff = s - spot; best = o; }
+                }
+            });
+            if (best) { sel.value = best.value; }
+        }
+
+        // ===== Refresh OI =====
+        function refreshOI() {
+            const expiry = document.getElementById('expirySelect').value;
+            const strike = document.getElementById('strikeSelect').value;
+            if (!expiry || !strike) return;
+
+            fetch(`/admin/trade/manual/oi-info?underlying=NIFTY&expiry=${expiry}&strike=${strike}&option_type=${optionType}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.error) return;
+
+                    document.getElementById('oiCurrent').textContent = (data.current_oi || 0).toLocaleString();
+
+                    const changePct = data.oi_change_pct || 0;
+                    const changePctEl = document.getElementById('oiChangePct');
+                    changePctEl.textContent = (changePct >= 0 ? '+' : '') + changePct + '%';
+                    changePctEl.className = 'value ' + (changePct >= 0 ? 'text-green' : 'text-red');
+
+                    document.getElementById('oiAvg').textContent = (data.avg_oi_change || 0).toLocaleString();
+
+                    const cePct = data.ce_oi_change_pct || 0;
+                    const ceEl = document.getElementById('ceOiPct');
+                    ceEl.textContent = (cePct >= 0 ? '+' : '') + cePct + '%';
+                    ceEl.className = 'value ' + (cePct >= 0 ? 'text-green' : 'text-red');
+
+                    const pePct = data.pe_oi_change_pct || 0;
+                    const peEl = document.getElementById('peOiPct');
+                    peEl.textContent = (pePct >= 0 ? '+' : '') + pePct + '%';
+                    peEl.className = 'value ' + (pePct >= 0 ? 'text-green' : 'text-red');
+
+                    // Direction badge
+                    const dir = data.direction || 'NO DATA';
+                    const dirEl = document.getElementById('oiDirection');
+                    dirEl.textContent = dir;
+                    dirEl.className = 'direction-badge ' + dirClass(dir);
+
+                    // LTP
+                    document.getElementById('ltpDisplay').textContent = '₹' + (data.ltp || 0).toFixed(2);
+
+                    // Spot
+                    if (data.spot) {
+                        document.getElementById('spotPrice').textContent = data.spot.toFixed(2);
+                    }
+                })
+                .catch(err => console.error('OI refresh error:', err));
+        }
+
+        function dirClass(dir) {
+            const map = {
+                'LONG BUILDUP': 'dir-long-buildup',
+                'SHORT BUILDUP': 'dir-short-buildup',
+                'SHORT COVERING': 'dir-short-covering',
+                'LONG UNWINDING': 'dir-long-unwinding',
+            };
+            return map[dir] || 'dir-no-data';
+        }
+
+        // ===== BUY =====
+        function placeBuy() {
+            const btn = document.getElementById('btnBuy');
+            if (btn.disabled) return;
+
+            if (!confirm(`Place BUY for ${optionType} ${document.getElementById('strikeSelect').value} to ALL active users?`)) return;
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Placing Orders...';
+
+            fetch('/admin/trade/manual/buy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    underlying: 'NIFTY',
+                    expiry: document.getElementById('expirySelect').value,
+                    strike: document.getElementById('strikeSelect').value,
+                    option_type: optionType,
+                })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ BUY ALL USERS';
+
+                    const toast = document.getElementById('resultToast');
+                    if (data.error) {
+                        toast.className = 'result-toast show error';
+                        toast.innerHTML = '❌ ' + data.error;
+                    } else {
+                        toast.className = 'result-toast show success';
+                        toast.innerHTML = `✅ ${data.total_users} users | Live: ${data.live_orders} | Paper: ${data.paper_orders} | Failed: ${data.failed_orders}`;
+                        if (data.errors && data.errors.length) {
+                            toast.innerHTML += '<br><small style="color:#8b949e;">' + data.errors.join(', ') + '</small>';
+                        }
+                        // Reload page to refresh tables
+                        setTimeout(() => location.reload(), 1500);
+                    }
+                    setTimeout(() => { toast.className = 'result-toast'; }, 8000);
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = '⚡ BUY ALL USERS';
+                    showToast('❌ Network error: ' + err.message, 'error');
+                });
+        }
+
+        // ===== SELL =====
+        function placeSell() {
+            const btn = document.getElementById('btnSell');
+            if (btn.disabled) return;
+
+            if (!confirm(`SELL (EXIT) all open ${optionType} ${document.getElementById('strikeSelect').value} trades?`)) return;
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Closing Trades...';
+
+            fetch('/admin/trade/manual/sell', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    expiry: document.getElementById('expirySelect').value,
+                    strike: document.getElementById('strikeSelect').value,
+                    option_type: optionType,
+                })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔴 SELL ALL (EXIT)';
+
+                    const toast = document.getElementById('resultToast');
+                    if (data.error) {
+                        toast.className = 'result-toast show error';
+                        toast.innerHTML = '❌ ' + data.error;
+                    } else {
+                        toast.className = 'result-toast show success';
+                        toast.innerHTML = `✅ Closed: ${data.closed} / ${data.total} | Failed: ${data.failed}`;
+                        if (data.errors && data.errors.length) {
+                            toast.innerHTML += '<br><small style="color:#8b949e;">' + data.errors.join(', ') + '</small>';
+                        }
+                        setTimeout(() => location.reload(), 1500);
+                    }
+                    setTimeout(() => { toast.className = 'result-toast'; }, 8000);
+                })
+                .catch(err => {
+                    btn.disabled = false;
+                    btn.innerHTML = '🔴 SELL ALL (EXIT)';
+                    showToast('❌ Network error: ' + err.message, 'error');
+                });
+        }
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('resultToast');
+            toast.className = 'result-toast show ' + type;
+            toast.innerHTML = msg;
+            setTimeout(() => { toast.className = 'result-toast'; }, 8000);
+        }
+
+        // ===== Load Orders (AJAX) =====
+        function loadOrders(page) {
+            const params = new URLSearchParams({
+                tab: currentTab,
+                page: page || 1,
+                date_from: document.getElementById('filterDateFrom').value || '',
+                date_to: document.getElementById('filterDateTo').value || '',
+                user_id: document.getElementById('filterUser').value || '',
+                option_type: document.getElementById('filterOptionType').value || '',
+                trade_mode: document.getElementById('filterTradeMode').value || '',
+            });
+
+            fetch('/admin/trade/manual/orders?' + params.toString())
+                .then(r => r.json())
+                .then(data => {
+                    const tbody = document.getElementById('historyBody');
+                    if (!data.orders || data.orders.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:#8b949e;padding:2rem;">No orders found</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.orders.map(o => `
+                        <tr>
+                            <td>${o.user}</td>
+                            <td>${o.symbol}</td>
+                            <td>${o.option_type}</td>
+                            <td>${o.entry_time}</td>
+                            <td>₹${(o.entry_price || 0).toFixed(2)}</td>
+                            <td>${o.exit_time || '—'}</td>
+                            <td>${o.exit_price ? '₹' + o.exit_price.toFixed(2) : '—'}</td>
+                            <td>${o.qty}</td>
+                            <td><span class="badge ${o.mode === 'Live' ? 'badge-success' : 'badge-warning'}">${o.mode}</span></td>
+                            <td>${o.oi_trend || '—'}</td>
+                            <td class="${(o.pnl || 0) >= 0 ? 'pnl-pos' : 'pnl-neg'}">${o.pnl !== null ? '₹' + (o.pnl || 0).toFixed(2) : '—'}</td>
+                            <td class="${(o.pnl_pct || 0) >= 0 ? 'pnl-pos' : 'pnl-neg'}">${o.pnl_pct !== null ? (o.pnl_pct || 0).toFixed(2) + '%' : '—'}</td>
+                            <td><span class="badge ${o.status === 'OPEN' ? 'badge-info' : 'badge-success'}">${o.status}</span></td>
+                        </tr>
+                    `).join('');
+                    }
+
+                    // Pagination
+                    const pag = document.getElementById('historyPagination');
+                    if (data.pages > 1) {
+                        let html = '';
+                        if (data.has_prev) html += `<button class="page-btn" onclick="loadOrders(${data.page - 1})">‹ Prev</button>`;
+                        for (let i = 1; i <= data.pages; i++) {
+                            html += `<button class="page-btn ${i === data.page ? 'active' : ''}" onclick="loadOrders(${i})">${i}</button>`;
+                        }
+                        if (data.has_next) html += `<button class="page-btn" onclick="loadOrders(${data.page + 1})">Next ›</button>`;
+                        pag.innerHTML = html;
+                    } else {
+                        pag.innerHTML = '';
+                    }
+                });
+        }
+    })();
+</script>
+{% endblock %}

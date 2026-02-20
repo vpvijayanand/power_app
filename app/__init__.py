@@ -26,11 +26,13 @@ def create_app(config_name=None):
     from app.dashboard import dashboard_bp
     from app.admin import admin_bp
     from app.kite import kite_bp
+    from app.trade import trade_bp
     
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(kite_bp)
+    app.register_blueprint(trade_bp)
     
     # Register main routes
     from app import routes
