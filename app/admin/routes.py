@@ -1197,8 +1197,39 @@ def oi_chart_data():
         current_app.logger.info(f"[OI-CHART] Nearest expiry = {expiry}")
 
         spot    = _oi_chart_spot(underlying, query_date)
-        strikes = _oi_build_strikes(spot)
-        current_app.logger.info(f"[OI-CHART] Spot={spot} Strikes={[int(s) for s in strikes]}")
+
+        # ── Dynamically resolve strikes based on actual available data ──
+        available_strikes_tuples = db.session.query(OptionChainData.strike_price).filter(
+            OptionChainData.underlying == underlying,
+            OptionChainData.expiry_date == expiry,
+            func.date(OptionChainData.timestamp) == query_date
+        ).distinct().order_by(OptionChainData.strike_price).all()
+
+        available_strikes = [float(s[0]) for s in available_strikes_tuples if s[0] is not None]
+
+        if available_strikes:
+            if spot > 0:
+                atm_strike = min(available_strikes, key=lambda x: abs(x - spot))
+            else:
+                atm_strike = available_strikes[len(available_strikes)//2]
+
+            atm_idx = available_strikes.index(atm_strike)
+            start_idx = max(0, atm_idx - 3)
+            end_idx = min(len(available_strikes), atm_idx + 4)
+            strikes = available_strikes[start_idx:end_idx]
+
+            # Adjust if we hit an edge and have enough total strikes
+            if len(strikes) < 7 and len(available_strikes) >= 7:
+                if start_idx == 0:
+                    strikes = available_strikes[:7]
+                else:
+                    strikes = available_strikes[-7:]
+        else:
+            step = 50 if underlying == 'NIFTY' else 100
+            atm = round(spot / step) * step if spot else 25000
+            strikes = [atm + (i * step) for i in range(-3, 4)]
+        
+        current_app.logger.info(f"[OI-CHART] Spot={spot}  →  Dynamic Strikes={[int(s) for s in strikes]}")
 
         any_index = db.session.query(func.count(IndexData.id)).filter(
             IndexData.symbol == underlying,
