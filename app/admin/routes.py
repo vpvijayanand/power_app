@@ -1084,43 +1084,68 @@ def export_users():
 # ===================================================================
 # Helpers shared by OI Chart routes
 # ===================================================================
-def _oi_chart_nearest_expiry(underlying='NIFTY'):
-    """Return nearest future expiry from Instruments table."""
-    today = datetime.now().date()
-    latest_fetch = db.session.query(func.max(Instrument.fetch_date)).filter(
-        Instrument.name == underlying,
-        Instrument.segment == 'NFO-OPT'
+# ===================================================================
+# REPLACE the two helpers + oi_chart() + oi_chart_data() in routes.py
+# ===================================================================
+
+def _oi_chart_nearest_expiry(underlying='NIFTY', query_date=None):
+    """
+    Return nearest expiry >= query_date from OptionChainData as plain string.
+    Uses string comparison so SQLite text columns always match.
+    """
+    if query_date is None:
+        query_date = datetime.now().date()
+
+    date_str = query_date.strftime('%Y-%m-%d')
+
+    raw = db.session.query(
+        func.min(OptionChainData.expiry_date)
+    ).filter(
+        OptionChainData.underlying  == underlying,
+        OptionChainData.expiry_date >= date_str        # string >= string
     ).scalar()
-    if not latest_fetch:
-        return None
-    exp = db.session.query(func.min(Instrument.expiry)).filter(
-        Instrument.name == underlying,
-        Instrument.segment == 'NFO-OPT',
-        Instrument.expiry >= today,
-        Instrument.fetch_date == latest_fetch
-    ).scalar()
-    return exp
+
+    return str(raw) if raw else None
 
 
 def _oi_chart_spot(underlying, query_date):
-    """Return latest Nifty close for the given date from IndexData."""
+    """Return latest close for underlying on query_date."""
     latest_ts = db.session.query(func.max(IndexData.timestamp)).filter(
         IndexData.symbol == underlying,
         func.date(IndexData.timestamp) == query_date
     ).scalar()
     if latest_ts:
-        row = db.session.query(IndexData.close).filter(
-            IndexData.symbol == underlying,
+        val = db.session.query(IndexData.close).filter(
+            IndexData.symbol    == underlying,
             IndexData.timestamp == latest_ts
         ).scalar()
-        return round(float(row), 2) if row else 0
+        return round(float(val), 2) if val else 0
     return 0
 
 
-def _oi_build_strikes(spot, step=100, count=3):
-    """Build 7 equidistant strikes around ATM (nearest 100)."""
-    atm = round(spot / step) * step if spot else 25000
-    return [atm + (i * step) for i in range(-count, count + 1)]
+def _oi_build_strikes_100(spot, available=None):
+    """
+    Return 7 strikes: ATM-300, ATM-200, ATM-100, ATM, ATM+100, ATM+200, ATM+300
+    ATM = spot rounded to nearest 100.
+    If 'available' list is given, snap ATM to the nearest strike in that list
+    and pick ±3 neighbours from it.
+    """
+    step = 100
+    atm  = round(spot / step) * step if spot else 23100
+
+    if available:
+        # Snap ATM to nearest strike actually in DB
+        atm = min(available, key=lambda x: abs(x - atm))
+        idx = available.index(atm)
+        lo  = max(0, idx - 3)
+        hi  = min(len(available), idx + 4)
+        picked = available[lo:hi]
+        # Pad to keep 7 if we hit a boundary
+        if len(picked) < 7 and len(available) >= 7:
+            picked = available[:7] if lo == 0 else available[-7:]
+        return picked
+
+    return [atm + (i * step) for i in range(-3, 4)]
 
 
 # ===================================================================
@@ -1130,32 +1155,40 @@ def _oi_build_strikes(spot, step=100, count=3):
 @login_required
 @admin_required
 def oi_chart():
-    underlying = 'NIFTY'
-    today = datetime.now().date()
-    date_str = request.args.get('date', today.strftime('%Y-%m-%d'))
+    today      = datetime.now().date()
+    date_str   = request.args.get('date', today.strftime('%Y-%m-%d'))
     start_time = request.args.get('start_time', '09:15')
-    end_time = request.args.get('end_time', '15:30')
+    end_time   = request.args.get('end_time', '15:30')
+    underlying = 'NIFTY'
 
     try:
         query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     except ValueError:
         query_date = today
-        date_str = query_date.strftime('%Y-%m-%d')
+        date_str   = query_date.strftime('%Y-%m-%d')
 
-    expiry = _oi_chart_nearest_expiry(underlying)
-    spot = _oi_chart_spot(underlying, query_date)
-    strikes = _oi_build_strikes(spot)
+    expiry  = _oi_chart_nearest_expiry(underlying, query_date)
+    spot    = _oi_chart_spot(underlying, query_date)
+
+    available_rows = db.session.query(OptionChainData.strike_price).filter(
+        OptionChainData.underlying == underlying,
+        OptionChainData.expiry_date == str(expiry) if expiry else None,
+        func.date(OptionChainData.timestamp) == query_date
+    ).distinct().order_by(OptionChainData.strike_price).all()
+    available = [float(r[0]) for r in available_rows if r[0] is not None]
+
+    strikes = _oi_build_strikes_100(spot, available if available else None)
 
     return render_template(
         'admin/oi_chart.html',
         underlying=underlying,
-        expiry=str(expiry) if expiry else '',
+        expiry=expiry or '',
         spot=spot,
         strikes=strikes,
         filters={
-            'date': date_str,
+            'date':       date_str,
             'start_time': start_time,
-            'end_time': end_time,
+            'end_time':   end_time,
         }
     )
 
@@ -1174,164 +1207,149 @@ def oi_chart_data():
         start_time_str = request.args.get('start_time', '09:15')
         end_time_str   = request.args.get('end_time', '15:30')
 
-        current_app.logger.info(
-            f"[OI-CHART] Request underlying={underlying} date={date_str} "
-            f"start={start_time_str} end={end_time_str}"
-        )
-
         try:
             query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
         except ValueError:
             query_date = datetime.now().date()
+            date_str   = query_date.strftime('%Y-%m-%d')
 
         try:
             market_open  = datetime.combine(query_date, datetime.strptime(start_time_str, '%H:%M').time())
-            market_close = datetime.combine(query_date, datetime.strptime(end_time_str, '%H:%M').time())
+            market_close = datetime.combine(query_date, datetime.strptime(end_time_str,   '%H:%M').time())
         except ValueError:
             market_open  = datetime.combine(query_date, datetime.strptime('09:15', '%H:%M').time())
             market_close = datetime.combine(query_date, datetime.strptime('15:30', '%H:%M').time())
 
-        current_app.logger.info(f"[OI-CHART] Window {market_open} to {market_close}")
+        # ── 1. Nearest expiry for THIS date (only one, nearest) ───────────
+        expiry_str = _oi_chart_nearest_expiry(underlying, query_date)
+        current_app.logger.info(f"[OI-CHART] Nearest expiry = {expiry_str!r}")
 
-        expiry = _oi_chart_nearest_expiry(underlying)
-        current_app.logger.info(f"[OI-CHART] Nearest expiry = {expiry}")
+        if not expiry_str:
+            return jsonify({
+                'error': 'No expiry found in OptionChainData for this date/underlying.',
+                'timestamps': [], 'nifty': [], 'strikes': {}, 'strike_list': [],
+                'spot': 0, 'expiry': '', '_debug': {}
+            })
 
-        spot    = _oi_chart_spot(underlying, query_date)
+        # ── 2. Spot ───────────────────────────────────────────────────────
+        spot = _oi_chart_spot(underlying, query_date)
 
-        # ── Dynamically resolve strikes based on actual available data ──
-        available_strikes_tuples = db.session.query(OptionChainData.strike_price).filter(
-            OptionChainData.underlying == underlying,
-            OptionChainData.expiry_date == expiry,
+        # ── 3. Strikes available in DB for THIS expiry & date ─────────────
+        #    Filter by expiry_str so we only see strikes for nearest expiry.
+        avail_rows = db.session.query(OptionChainData.strike_price).filter(
+            OptionChainData.underlying  == underlying,
+            OptionChainData.expiry_date == expiry_str,     # ← scoped to nearest expiry
             func.date(OptionChainData.timestamp) == query_date
         ).distinct().order_by(OptionChainData.strike_price).all()
 
-        available_strikes = [float(s[0]) for s in available_strikes_tuples if s[0] is not None]
+        available = [float(r[0]) for r in avail_rows if r[0] is not None]
+        current_app.logger.info(
+            f"[OI-CHART] Available strikes for expiry {expiry_str}: "
+            f"count={len(available)}  sample={available[:10]}"
+        )
 
-        if available_strikes:
-            if spot > 0:
-                atm_strike = min(available_strikes, key=lambda x: abs(x - spot))
-            else:
-                atm_strike = available_strikes[len(available_strikes)//2]
+        # ── 4. Pick 7 strikes around ATM ──────────────────────────────────
+        strikes = _oi_build_strikes_100(spot, available if available else None)
+        current_app.logger.info(f"[OI-CHART] spot={spot}  chosen strikes={[int(s) for s in strikes]}")
 
-            atm_idx = available_strikes.index(atm_strike)
-            start_idx = max(0, atm_idx - 3)
-            end_idx = min(len(available_strikes), atm_idx + 4)
-            strikes = available_strikes[start_idx:end_idx]
-
-            # Adjust if we hit an edge and have enough total strikes
-            if len(strikes) < 7 and len(available_strikes) >= 7:
-                if start_idx == 0:
-                    strikes = available_strikes[:7]
-                else:
-                    strikes = available_strikes[-7:]
-        else:
-            step = 50 if underlying == 'NIFTY' else 100
-            atm = round(spot / step) * step if spot else 25000
-            strikes = [atm + (i * step) for i in range(-3, 4)]
-        
-        current_app.logger.info(f"[OI-CHART] Spot={spot}  →  Dynamic Strikes={[int(s) for s in strikes]}")
-
+        # ── 5. Diagnostic counts ──────────────────────────────────────────
         any_index = db.session.query(func.count(IndexData.id)).filter(
             IndexData.symbol == underlying,
             func.date(IndexData.timestamp) == query_date
         ).scalar() or 0
 
-        any_oc = db.session.query(func.count(OptionChainData.id)).filter(
+        any_oc_total = db.session.query(func.count(OptionChainData.id)).filter(
             OptionChainData.underlying == underlying,
             func.date(OptionChainData.timestamp) == query_date
         ).scalar() or 0
 
-        current_app.logger.info(
-            f"[OI-CHART] IndexData rows={any_index}  OptionChainData rows={any_oc}"
-        )
-
-        oc_expiries = db.session.query(OptionChainData.expiry_date).filter(
-            OptionChainData.underlying == underlying,
+        # Rows for the chosen expiry only
+        any_oc_expiry = db.session.query(func.count(OptionChainData.id)).filter(
+            OptionChainData.underlying  == underlying,
+            OptionChainData.expiry_date == expiry_str,
             func.date(OptionChainData.timestamp) == query_date
-        ).distinct().all()
-        oc_expiry_list = [str(e[0]) for e in oc_expiries if e[0]]
+        ).scalar() or 0
 
-        oc_strikes_raw = db.session.query(OptionChainData.strike_price).filter(
-            OptionChainData.underlying == underlying,
+        # Rows for chosen expiry + chosen strikes (pre-window)
+        any_oc_strikes = db.session.query(func.count(OptionChainData.id)).filter(
+            OptionChainData.underlying   == underlying,
+            OptionChainData.expiry_date  == expiry_str,
+            OptionChainData.strike_price.in_(strikes),
             func.date(OptionChainData.timestamp) == query_date
-        ).distinct().order_by(OptionChainData.strike_price).all()
-        oc_strikes_sample = [float(s[0]) for s in oc_strikes_raw[:20] if s[0] is not None]
-        more_strikes_suffix = ' ...' if len(oc_strikes_raw) > 20 else ''
+        ).scalar() or 0
 
         current_app.logger.info(
-            f"[OI-CHART] OC expiries={oc_expiry_list}  strikes sample={oc_strikes_sample}{more_strikes_suffix}"
+            f"[OI-CHART] IndexData rows={any_index} | "
+            f"OC total={any_oc_total} | OC expiry={any_oc_expiry} | "
+            f"OC expiry+strikes={any_oc_strikes}"
         )
 
-        # ── Main OI query ──
-        # Cast expiry to string just in case SQLite fails date object matching
-        str_expiry = expiry.strftime('%Y-%m-%d') if isinstance(expiry, datetime) or hasattr(expiry, 'strftime') else str(expiry)
-        
-        # Don't use >= timestamp in SQLite, it often fails depending on text/datetime type.
-        # Just grab the 7 strikes for the whole day, then filter in python.
+        # ── 6. Fetch OI rows ──────────────────────────────────────────────
         raw_rows = db.session.query(
             OptionChainData.timestamp,
             OptionChainData.strike_price,
             OptionChainData.ce_oi,
             OptionChainData.pe_oi,
         ).filter(
-            OptionChainData.underlying == underlying,
-            OptionChainData.expiry_date == str_expiry,
+            OptionChainData.underlying   == underlying,
+            OptionChainData.expiry_date  == expiry_str,
             OptionChainData.strike_price.in_(strikes),
             func.date(OptionChainData.timestamp) == query_date
         ).order_by(OptionChainData.timestamp).all()
 
+        current_app.logger.info(f"[OI-CHART] raw_rows before window filter = {len(raw_rows)}")
+
+        # ── 7. Parse timestamps & window filter ───────────────────────────
+        def _parse_ts(val):
+            if isinstance(val, datetime):
+                return val
+            if not val:
+                return None
+            val_str = str(val).split('+')[0].split('.')[0].replace('T', ' ')
+            try:
+                return datetime.strptime(val_str, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                try:
+                    return datetime.strptime(val_str, '%Y-%m-%d %H:%M')
+                except ValueError:
+                    return None
+
         rows = []
         for r in raw_rows:
-            # handle string vs datetime from sqlite
-            if isinstance(r.timestamp, str):
-                try:
-                    ts_val = datetime.strptime(r.timestamp, '%Y-%m-%d %H:%M:%S')
-                except ValueError:
-                    try:
-                        ts_val = datetime.strptime(r.timestamp, '%Y-%m-%dT%H:%M:%S')
-                    except ValueError:
-                        continue
-            else:
-                ts_val = r.timestamp
-            
-            if market_open <= ts_val <= market_close:
-                # Add parsed ts for easy use
-                r_dict = {
-                    'parsed_ts': ts_val,
-                    'strike_price': r.strike_price,
-                    'ce_oi': r.ce_oi or 0,
-                    'pe_oi': r.pe_oi or 0
-                }
-                rows.append(r_dict)
+            ts_val = _parse_ts(r.timestamp)
+            if ts_val and market_open <= ts_val <= market_close:
+                rows.append({
+                    'parsed_ts':    ts_val,
+                    'strike_price': float(r.strike_price),
+                    'ce_oi':        int(r.ce_oi or 0),
+                    'pe_oi':        int(r.pe_oi or 0),
+                })
 
-        current_app.logger.info(f"[OI-CHART] OI rows in window after Python filter = {len(rows)}")
-        
-        # User requested: "data at 9:15 OI must be compared with every minute data" -> Change in OI chart
-        initial_oi = {} # baseline from 9:15
-        strike_map = {str(int(s)): {} for s in strikes}
-        timestamps_set = sorted(set(r['parsed_ts'].strftime('%H:%M') for r in rows))
-        
+        current_app.logger.info(f"[OI-CHART] OI rows inside window = {len(rows)}")
+
+        # ── 8. Build OI-change series (baseline = first row per strike) ────
+        strike_keys      = [str(int(s)) for s in strikes]
+        strike_snapshots = {sk: {} for sk in strike_keys}
+        baseline_oi      = {}
+
         for r in rows:
-            sk = str(int(r['strike_price']))
+            sk     = str(int(r['strike_price']))
             ts_str = r['parsed_ts'].strftime('%H:%M')
-            
-            if sk not in initial_oi:
-                initial_oi[sk] = {'ce': r['ce_oi'], 'pe': r['pe_oi']}
-                
-            # Chart the difference (Change in OI)
-            ce_diff = r['ce_oi'] - initial_oi[sk]['ce']
-            pe_diff = r['pe_oi'] - initial_oi[sk]['pe']
-            
-            if sk in strike_map:
-                strike_map[sk][ts_str] = {'ce_oi': ce_diff, 'pe_oi': pe_diff}
 
-        strikes_data = {}
-        for sk in strike_map:
-            strikes_data[sk] = {
-                'ce_oi': [strike_map[sk].get(ts, {}).get('ce_oi', None) for ts in timestamps_set],
-                'pe_oi': [strike_map[sk].get(ts, {}).get('pe_oi', None) for ts in timestamps_set],
-            }
+            if sk not in baseline_oi:
+                baseline_oi[sk] = {'ce': r['ce_oi'], 'pe': r['pe_oi']}
 
+            if sk in strike_snapshots:
+                strike_snapshots[sk][ts_str] = {
+                    'ce_oi': r['ce_oi'] - baseline_oi[sk]['ce'],
+                    'pe_oi': r['pe_oi'] - baseline_oi[sk]['pe'],
+                }
+
+        oi_timestamps = sorted(set(
+            ts for sk in strike_snapshots for ts in strike_snapshots[sk]
+        ))
+
+        # ── 9. Fetch Nifty price series ───────────────────────────────────
         index_rows = db.session.query(
             IndexData.timestamp,
             IndexData.close,
@@ -1342,42 +1360,44 @@ def oi_chart_data():
             IndexData.timestamp <= market_close,
         ).order_by(IndexData.timestamp).all()
 
-        current_app.logger.info(f"[OI-CHART] Nifty rows in window = {len(index_rows)}")
+        nifty_map = {}
+        for r in index_rows:
+            ts_val = _parse_ts(r.timestamp)
+            if ts_val:
+                nifty_map[ts_val.strftime('%H:%M')] = round(float(r.close), 2)
 
-        nifty_map      = {r.timestamp.strftime('%H:%M'): round(float(r.close), 2) for r in index_rows}
-        all_timestamps = sorted(set(timestamps_set) | set(nifty_map.keys()))
-        nifty_series   = [nifty_map.get(ts, None) for ts in all_timestamps]
+        # ── 10. Merge timelines ───────────────────────────────────────────
+        all_timestamps = sorted(set(oi_timestamps) | set(nifty_map.keys()))
+        nifty_series   = [nifty_map.get(ts) for ts in all_timestamps]
 
-        for sk in strikes_data:
+        strikes_data = {}
+        for sk in strike_keys:
             strikes_data[sk] = {
-                'ce_oi': [strike_map[sk].get(ts, {}).get('ce_oi', None) for ts in all_timestamps],
-                'pe_oi': [strike_map[sk].get(ts, {}).get('pe_oi', None) for ts in all_timestamps],
+                'ce_oi': [strike_snapshots[sk].get(ts, {}).get('ce_oi') for ts in all_timestamps],
+                'pe_oi': [strike_snapshots[sk].get(ts, {}).get('pe_oi') for ts in all_timestamps],
             }
-
-        nifty_pts = sum(1 for v in nifty_series if v is not None)
-        current_app.logger.info(
-            f"[OI-CHART] Final timestamps={len(all_timestamps)} nifty_pts={nifty_pts} "
-            f"strike_keys={list(strikes_data.keys())}"
-        )
 
         return jsonify({
             'timestamps':  all_timestamps,
             'nifty':       nifty_series,
             'strikes':     strikes_data,
-            'strike_list': [str(int(s)) for s in strikes],
+            'strike_list': strike_keys,
             'spot':        spot,
-            'expiry':      str(expiry) if expiry else '',
+            'expiry':      expiry_str,
             '_debug': {
-                'any_index_rows':     any_index,
-                'any_oc_rows':        any_oc,
-                'oc_expiries':        oc_expiry_list,
-                'oc_strikes_sample':  oc_strikes_sample,
-                'expiry_used':        str(expiry) if expiry else None,
-                'strikes_queried':    [int(s) for s in strikes],
-                'oi_rows_fetched':    len(rows),
-                'nifty_rows_fetched': len(index_rows),
-                'window_open':        str(market_open),
-                'window_close':       str(market_close),
+                'any_index_rows':          any_index,
+                'any_oc_total':            any_oc_total,
+                'any_oc_for_expiry':       any_oc_expiry,
+                'any_oc_expiry_strikes':   any_oc_strikes,   # ← KEY: if still 0, strikes truly missing
+                'expiry_used':             expiry_str,
+                'available_strikes_count': len(available),
+                'available_strikes_sample':available[:20],
+                'strikes_queried':         [int(s) for s in strikes],
+                'oi_rows_raw':             len(raw_rows),
+                'oi_rows_in_window':       len(rows),
+                'nifty_rows_in_window':    len(index_rows),
+                'window_open':             str(market_open),
+                'window_close':            str(market_close),
             }
         })
 
@@ -1385,11 +1405,4 @@ def oi_chart_data():
         err_msg = str(exc)
         tb_str  = _tb.format_exc()
         current_app.logger.error(f"[OI-CHART] EXCEPTION: {err_msg}\n{tb_str}")
-        return jsonify({
-            'error':     err_msg,
-            'traceback': tb_str,
-            '_debug':    {'exception': err_msg}
-        }), 500
-
-
-
+        return jsonify({'error': err_msg, 'traceback': tb_str}), 500
