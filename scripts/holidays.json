@@ -1,0 +1,19 @@
+{
+    "holidays_2026": [
+        {"sr_no": 1,  "date": "2026-01-26", "day": "Monday",   "description": "Republic Day"},
+        {"sr_no": 2,  "date": "2026-03-03", "day": "Tuesday",  "description": "Holi"},
+        {"sr_no": 3,  "date": "2026-03-26", "day": "Thursday", "description": "Shri Ram Navami"},
+        {"sr_no": 4,  "date": "2026-03-31", "day": "Tuesday",  "description": "Shri Mahavir Jayanti"},
+        {"sr_no": 5,  "date": "2026-04-03", "day": "Friday",   "description": "Good Friday"},
+        {"sr_no": 6,  "date": "2026-04-14", "day": "Tuesday",  "description": "Dr. Baba Saheb Ambedkar Jayanti"},
+        {"sr_no": 7,  "date": "2026-05-01", "day": "Friday",   "description": "Maharashtra Day"},
+        {"sr_no": 8,  "date": "2026-05-28", "day": "Thursday", "description": "Bakri Id"},
+        {"sr_no": 9,  "date": "2026-06-26", "day": "Friday",   "description": "Muharram"},
+        {"sr_no": 10, "date": "2026-09-14", "day": "Monday",   "description": "Ganesh Chaturthi"},
+        {"sr_no": 11, "date": "2026-10-02", "day": "Friday",   "description": "Mahatma Gandhi Jayanti"},
+        {"sr_no": 12, "date": "2026-10-20", "day": "Tuesday",  "description": "Dussehra"},
+        {"sr_no": 13, "date": "2026-11-10", "day": "Tuesday",  "description": "Diwali-Balipratipada"},
+        {"sr_no": 14, "date": "2026-11-24", "day": "Tuesday",  "description": "Prakash Gurpurb Sri Guru Nanak Dev"},
+        {"sr_no": 15, "date": "2026-12-25", "day": "Friday",   "description": "Christmas"}
+    ]
+}

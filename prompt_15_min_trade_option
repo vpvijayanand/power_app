@@ -1,0 +1,164 @@
+I need to create a python stand alone script which does live trading using kite zerodha.
+I have a index_data table  like \d index_data
+                                             Table "public.index_data"
+        Column        |            Type             | Collation | Nullable |                Default                 
+----------------------+-----------------------------+-----------+----------+----------------------------------------
+ id                   | integer                     |           | not null | nextval('index_data_id_seq'::regclass)
+ timestamp            | timestamp without time zone |           | not null | 
+ symbol               | character varying(20)       |           | not null | 
+ instrument_token     | integer                     |           |          | 
+ open                 | double precision            |           |          | 
+ high                 | double precision            |           |          | 
+ low                  | double precision            |           |          | 
+ close                | double precision            |           |          | 
+ ma_20                | double precision            |           |          | 
+ ma_200               | double precision            |           |          | 
+ fast_ma_39           | double precision            |           |          | 
+ fast_ma_69           | double precision            |           |          | 
+ atr                  | double precision            |           |          | 
+ adx                  | double precision            |           |          | 
+ supertrend           | double precision            |           |          | 
+ supertrend_direction | integer                     |           |          | 
+ super_power          | character varying(20)       |           |          | 
+ super_power_brick    | double precision            |           |          | 
+Indexes:
+    "index_data_pkey" PRIMARY KEY, btree (id)
+    "ix_index_data_symbol" btree (symbol)
+    "ix_index_data_timestamp" btree ("timestamp")
+Which stores nifty and banknifty data for every 1 minitue  sample data  id  |      timestamp      |  symbol   | instrument_token |   open   |   high   |   low    |  close   |       ma_20        |       ma_200       |     fast_ma_39     |     fast_ma_69     |        atr         |        adx         |     supertrend     | supertrend_direction | super_power | super_power_brick 
+------+---------------------+-----------+------------------+----------+----------+----------+----------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+----------------------+-------------+-------------------
+ 5215 | 2026-03-02 15:26:00 | BANKNIFTY |           260105 | 59919.75 | 59942.15 | 59918.05 |    59934 |         59887.2125 | 59688.703499999996 | 59848.591025641035 |  59798.45362318841 |  40.89543619212849 |  18.90008888005229 |  59814.69726777249 |                    1 |             |                10
+ 5214 | 2026-03-02 15:26:00 | NIFTY     |           256265 | 24878.45 |  24886.1 | 24876.45 |  24883.6 |         24885.2825 | 24749.393500000002 | 24870.080769230768 |  24839.58043478261 | 18.046677068289576 | 17.326509418988024 | 24853.957119631046 |                    1 | BUY         |                10
+ 5213 | 2026-03-02 15:25:00 | BANKNIFTY |           260105 |  59903.7 |  59933.6 | 59903.55 | 59920.15 |         59878.8375 |        59687.75975 |  59846.88846153846 | 59795.157971014494 |  42.18739282229233 |  18.82366850363097 |  59814.69726777249 |                    1 | BUY         |                10
+ 5212 | 2026-03-02 15:25:00 | NIFTY     |           256265 | 24864.25 | 24876.35 | 24864.25 |  24875.4 |          24883.325 | 24748.801500000005 |  24870.05769230769 | 24837.988405797103 | 18.611806073542844 |  18.45655124054394 | 24853.957119631046 |                    1 |             |                10
+ 5211 | 2026-03-02 15:24:00 | BANKNIFTY |           260105 |  59894.1 | 59911.95 | 59883.45 |  59902.3 | 59870.255000000005 | 59686.830250000006 | 59842.675641025635 |            59792.6 |  43.02488457785361 | 18.949173059369638 |  59814.69726777249 |                    1 |             |                10
+ 5210 | 2026-03-02 15:24:00 | NIFTY     |           256265 |  24871.6 | 24872.55 |  24860.4 | 24864.25 |           24881.28 | 24748.244749999998 | 24868.964102564107 |  24836.75072463768 |  19.11271423304625 | 19.446806985776032 | 24853.957119631046 |                    1 |             |                10
+ 5209 | 2026-03-02 15:23:00 | BANKNIFTY |           260105 | 59950.05 | 59956.35 | 59893.75 | 59893.75 |          59865.625 |         59686.0795 |  59839.66025641026 |  59789.35434782609 |  44.14218339153466 |  19.63291523835276 |  59814.69726777249 |                    1 | SELL        |                10
+ 5208 | 2026-03-02 15:23:00 | NIFTY     |           256265 | 24904.25 | 24904.55 | 24869.65 | 24869.65 | 24881.267499999998 |        24747.79725 | 24868.497435897436 | 24835.169565217395 | 19.648307635588438 | 20.257288408567177 | 24853.957119631046 |                    1 |             |                10
+ 5207 | 2026-03-02 15:22:00 | BANKNIFTY |           260105 | 59924.15 |  59953.3 |    59923 |  59950.5 | 59860.259999999995 | 59685.312750000005 | 59837.847435897434 |  59786.89347826087 |  42.72235134472974 | 20.034408698162363 |  59814.69726777249 |                    1 | BUY         |                10
+ 5206 | 2026-03-02 15:22:00 | NIFTY     |           256265 |  24892.8 |  24905.6 |    24892 |  24903.2 | 24880.552499999998 | 24747.298499999997 |  24868.28076923077 |  24833.98043478261 |  18.47510053063387 | 21.667505941323117 | 24853.957119631046 |   
+I need to take data from 9:15 to 930 to calculate 15 minitues data for the nifty open,high,low, close and keep this as the base data
+for the current day
+
+Based on this python backtest logic I need to create a python standalone file which runs as a service I should use the python backtest 
+file for getting buy, or sell or exit the trade and also the no of trades per day. I have a env file with has all the credetionls for  Database. also all the open trades must be closed by 3:15PM 
+
+Now If we get a buy signal we need to get the nifty current price and round off to the nearest 100  which is less then the nifty current price and buy CE of that strike 
+And if we get a sell signal we need to get the nifty current price and round off to the nearest 100 which is above the nifty current price and buy PE of that strike.
+I have a instruments table  \d instruments
+                                           Table "public.instruments"
+      Column      |            Type             | Collation | Nullable |                 Default                 
+------------------+-----------------------------+-----------+----------+-----------------------------------------
+ id               | integer                     |           | not null | nextval('instruments_id_seq'::regclass)
+ instrument_token | bigint                      |           | not null | 
+ exchange_token   | bigint                      |           |          | 
+ tradingsymbol    | character varying(50)       |           | not null | 
+ name             | character varying(200)      |           |          | 
+ last_price       | numeric(10,2)               |           |          | 
+ expiry           | date                        |           |          | 
+ strike           | numeric(10,2)               |           |          | 
+ tick_size        | numeric(10,2)               |           |          | 
+ lot_size         | integer                     |           |          | 
+ instrument_type  | character varying(20)       |           |          | 
+ segment          | character varying(20)       |           |          | 
+ exchange         | character varying(20)       |           |          | 
+ fetch_date       | date                        |           | not null | 
+ expiry_weekday   | character varying(20)       |           |          | 
+ created_at       | timestamp without time zone |           |          | 
+ updated_at       | timestamp without time zone |           |          | 
+Indexes:
+    "instruments_pkey" PRIMARY KEY, btree (id)
+    "ix_instruments_exchange" btree (exchange)
+    "ix_instruments_fetch_date" btree (fetch_date)
+    "ix_instruments_instrument_token" btree (instrument_token)
+    "ix_instruments_tradingsymbol" btree (tradingsymbol) which stores the data like id   | instrument_token | exchange_token | tradingsymbol | name | last_price | expiry | strike | tick_size | lot_size | instrument_type | segment | exchange | fetch_date | expiry_weekday |         created_at         |         updated_at         
+--------+------------------+----------------+---------------+------+------------+--------+--------+-----------+----------+-----------------+---------+----------+------------+----------------+----------------------------+----------------------------
+ 170247 |        194983681 |         761655 | ISIFHLSG-SF   |      |       0.00 |        |   0.00 |      0.01 |        1 | EQ              | NSE     | NSE      | 2026-02-19 |                | 2026-02-19 20:57:11.543014 | 2026-02-19 20:57:11.543419
+ 170246 |        194983169 |         761653 | ISIFHLSDG-SF  |      |       0.00 |        |   0.00 |      0.01 |        1 | EQ              | NSE     | NSE      | 2026-02-19 |                | 2026-02-19 20:57:11.543014 | 2026-02-19 20:57:11.543419
+ 170245 |        194955777 |         761546 | ARSIFHRHD-SF  |      |       0.00 |        |   0.00 |      0.01 |        1 | EQ              | NSE     | NSE      | 2026-02-19 |                | 2026-02-19 20:57:11.543014 | 2026-02-19 20:57:11.543419
+ 170244 |        194955265 |         761544 | ARSIFHDG-SF   |      |       0.00 |        |   0.00 |      0.01 |        1 | EQ              | NSE     | NSE      | 2026-02-19 |                | 2026-02-19 20:57:11.543014 | 2026-02-19 20:57:11.543419
+ 170243 |        194954753 |         761542 | ARSIFHRMD-SF  |      |       0.00 |        |   0.00 |      0.01 |        1 | EQ              | NSE     | NSE      | 2026-02-19 |                | 2026-02-19 20:57:11.543014 | 2026-02-19 20:57:11.543419
+From which I need to get the nifty options nearest expiry instrument  based the strike price that I need to buy and if the nearest expiry is today select the next nearest expiry as there could be a huge teta decay on the day.
+Also I have a users table \d users;
+                                                Table "public.users"
+          Column           |            Type             | Collation | Nullable |              Default              
+---------------------------+-----------------------------+-----------+----------+-----------------------------------
+ id                        | integer                     |           | not null | nextval('users_id_seq'::regclass)
+ name                      | character varying(100)      |           | not null | 
+ email                     | character varying(150)      |           | not null | 
+ mobile                    | character varying(15)       |           |          | 
+ password_hash             | character varying(255)      |           | not null | 
+ api_key                   | character varying(100)      |           |          | 
+ api_secret                | character varying(100)      |           |          | 
+ request_token             | text                        |           |          | 
+ kite_callback_token       | character varying(128)      |           |          | 
+ user_type                 | character varying(20)       |           | not null | 
+ trade_mode                | character varying(20)       |           | not null | 
+ lot_size                  | integer                     |           | not null | 
+ account_growth_percentage | numeric(15,2)               |           | not null | 
+ kite_account_balance      | numeric(15,2)               |           | not null | 
+ is_active                 | boolean                     |           | not null | 
+ created_at                | timestamp without time zone |           |          | 
+ updated_at                | timestamp without time zone |           |          | 
+ last_balance_update       | timestamp without time zone |           |          | 
+ access_token              | text                        |           |          | 
+Indexes:
+    "users_pkey" PRIMARY KEY, btree (id)
+    "ix_users_email" UNIQUE, btree (email)
+    "ix_users_kite_callback_token" UNIQUE, btree (kite_callback_token)
+Referenced by:
+    TABLE "user_trades" CONSTRAINT "user_trades_user_id_fkey" FOREIGN KEY (user_id) REFERENCES users(id)
+id |  name  |           email           |    mobile     |                                                                           password_hash                                                                            |     api_key      |            api_secret            |          request_token           |             kite_callback_token             | user_type | trade_mode | lot_size | account_growth_percentage | kite_account_balance | is_active |         created_at         |         updated_at         | last_balance_update |           access_token           
+----+--------+---------------------------+---------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------+------------------+----------------------------------+----------------------------------+---------------------------------------------+-----------+------------+----------+---------------------------+----------------------+-----------+----------------------------+----------------------------+---------------------+----------------------------------
+  4 | Ilango | Ilango.eng@gmail.com      | 968 9663 0871 | scrypt:32768:8:1$DnUOlPpVDAD84tmV$d112759f537f52f911e54d9fb9e93f5e7888222fa72e9abd4ef273128cbe0219eb4ff7afb6fa7bc746e8249881db44129e661bbbaa71613aa9dd8881109046e5 | vnl8tq8dhng1x | 26ulbn1ccutw39ljo9ybksz5xppi | o7i9pyGOG2i639v55upKI0OfpKU | DezechbYhdTHJpU_FSd6TEdBXMvulq0cKKNYW8vSrRA | Client    | Live       |        1 |                      0.00 |                 0.00 | t         | 2026-02-20 02:13:01.673889 | 2026-03-02 03:29:12.422847 |                     | d6Ddp5cYiljxcEaLgZ3tQbX3lMTr6VqD
+  3 | Gokul  | gokulvijayanand@gmail.com | 9150387791    | scrypt:32768:8:1$XtPqCYejr3hZUYDl$204a019ce5be70c1561f7d383ed76d9e88ab9c0b10a20cd6acb92b4bc05ce0555f5b8d105be8ab18ec36265f9989dbf6c601073947d89ba6e445dbf4c232f975 | iwg56iridj2dux | 94k1kjh3o2hcl56hwpua2qvfa4 | QqVqrlP6o1f7F7gONiOR6uH38gu | lNRj-e6jCKlrutXxOiGzJLIrSZaQPbAawpdnq4ysib8 | Client    | Live       |        1 |                      0.00 |                 0.00 | t         | 2026-02-20 02:04:13.696865 | 2026-03-02 01:22:16.45405  |                     | 4SNKHtfPRwfckQzUAi2X5kJXhvHfoZvK 
+If there is a buy I need to check this table for usertype client and if the trade mode is live or paper and the lot size to trade. Also if the trade is a live i have all the data that is needed for Kite live order to be placed. Based on the trade_mode I need to place the order live or paper for both the type I need to insert the data in the user_trades table   Table "public.user_trades"
+         Column         |            Type             | Collation | Nullable |                 Default                 
+------------------------+-----------------------------+-----------+----------+-----------------------------------------
+ id                     | integer                     |           | not null | nextval('user_trades_id_seq'::regclass)
+ trade_date             | date                        |           | not null | 
+ user_id                | integer                     |           | not null | 
+ nifty_price            | double precision            |           |          | 
+ trade_symbol           | character varying(100)      |           | not null | 
+ trade_instrument_token | bigint                      |           |          | 
+ option_type            | character varying(5)        |           | not null | 
+ strike_price           | double precision            |           |          | 
+ expiry_date            | date                        |           |          | 
+ entry_time             | timestamp without time zone |           | not null | 
+ entry_price            | double precision            |           | not null | 
+ actual_entry_price     | double precision            |           |          | 
+ lot_size               | integer                     |           |          | 
+ quantity               | integer                     |           | not null | 
+ trade_type             | character varying(10)       |           | not null | 
+ exit_time              | timestamp without time zone |           |          | 
+ exit_price             | double precision            |           |          | 
+ actual_exit_price      | double precision            |           |          | 
+ trade_status           | character varying(20)       |           | not null | 
+ trade_mode             | character varying(20)       |           | not null | 
+ kite_order_id_entry    | character varying(50)       |           |          | 
+ kite_order_id_exit     | character varying(50)       |           |          | 
+ oi_trend               | character varying(50)       |           |          | 
+ avg_oi_change_5min     | double precision            |           |          | 
+ capital_used           | double precision            |           |          | 
+ closing_pnl            | double precision            |           |          | 
+ pnl_percentage         | double precision            |           |          | 
+ max_pnl                | double precision            |           |          | 
+ min_pnl                | double precision            |           |          | 
+ created_at             | timestamp without time zone |           |          | 
+ updated_at             | timestamp without time zone |           |          | 
+Indexes:
+    "user_trades_pkey" PRIMARY KEY, btree (id)   
+id | trade_date | user_id | nifty_price |   trade_symbol    | trade_instrument_token | option_type | strike_price | expiry_date |         entry_time         | entry_price | actual_entry_price | lot_size | quantity | trade_type |         exit_time          | exit_price | actual_exit_price | trade_status | trade_mode | kite_order_id_entry | kite_order_id_exit |    oi_trend    | avg_oi_change_5min | capital_used | closing_pnl | pnl_percentage |       max_pnl       |       min_pnl       |         created_at         |         updated_at         
+----+------------+---------+-------------+-------------------+------------------------+-------------+--------------+-------------+----------------------------+-------------+--------------------+----------+----------+------------+----------------------------+------------+-------------------+--------------+------------+---------------------+--------------------+----------------+--------------------+--------------+-------------+----------------+---------------------+---------------------+----------------------------+----------------------------
+  1 | 2026-02-20 |       1 |    25620.15 | NIFTY26FEB25600CE |               16603138 | CE          |        25600 | 2026-02-24  | 2026-02-20 14:18:47.82583  |      144.55 |             144.55 |       65 |       65 | BUY        | 2026-02-20 14:19:03.13168  |      149.9 |             149.9 | CLOSED       | Paper      |                     |                    | LONG BUILDUP   |            1564940 |      9395.75 |      347.75 |            3.7 |  347.74999999999966 |  347.74999999999966 | 2026-02-20 08:48:48.468464 | 2026-02-20 08:49:03.133876
+  2 | 2026-02-20 |       2 |    25620.15 | NIFTY26FEB25600CE |               16603138 | CE          |        25600 | 2026-02-24  | 2026-02-20 14:18:47        |      144.55 |             148.15 |       65 |       65 | BUY        | 2026-02-20 14:19:03        |      149.9 |            147.85 | CLOSED       | Live       | 260220151291216     | 260220151292150    | LONG BUILDUP   |            1564940 |      9395.75 |      347.75 |            3.7 |  347.74999999999966 |  347.74999999999966 | 2026-02-20 08:48:48.468467 | 2026-02-20 08:49:03.776326
+  3 | 2026-02-20 |       1 |    25629.25 | NIFTY26FEB25600CE |               16603138 | CE          |        25600 | 2026-02-24  | 2026-02-20 14:19:47.997469 |       149.9 |              149.9 |       65 |       65 | BUY        | 2026-02-20 14:21:54.501535 |     146.75 |            146.75 | CLOSED       | Paper      |                     |                    | LONG BUILDUP   |            1635985 |       9743.5 |     -204.75 |           -2.1 | -204.75000000000037 | -204.75000000000037 | 2026-02-20 08:49:48.703733 | 2026-02-20 08:51:54.503318
+  4 | 2026-02-20 |       2 |    25629.25 | NIFTY26FEB25600CE |               16603138 | CE          |        25600 | 2026-02-24  | 2026-02-20 14:19:48        |       149.9 |             151.65 |       65 |       65 | BUY        | 2026-02-20 14:21:54        |     146.75 |             152.3 | CLOSED       | Live       | 260220151294409     | 260220151301340    | LONG BUILDUP   |            1635985 |       9743.5 |     -204.75 |           -2.1 | -204.75000000000037 | -204.75000000000037 | 2026-02-20 08:49:48.703736 | 2026-02-20 08:51:55.136847
+  5 | 2026-02-20 |       1 |     25591.1 | NIFTY26FEB25200PE |               16598530 | PE          |        25200 | 2026-02-24  | 2026-02-20 14:30:10.921451 |          33 |                 33 |       65 |       65 | BUY        | 2026-02-20 14:32:26.275026 |       31.6 |              31.6 | CLOSED       | Paper      |                     |                    | LONG BUILDUP   |            1544389 |         2145 |         -91 |          -4.24 |  -90.99999999999991 |  -90.99999999999991 | 2026-02-20 09:00:11.746592 | 2026-02-20 09:02:26.276245
+  6 | 2026-02-20 |       2 |     25591.1 | NIFTY26FEB25200PE |               16598530 | PE          |        25200 | 2026-02-24  | 2026-02-20 14:30:11        |          33 |              33.45 |       65 |       65 | BUY        | 2026-02-20 14:32:26        |       31.6 |              31.4 | CLOSED       | Live       | 260220151326311     | 260220151333186    | LONG BUILDUP   |            1544389 |         2145 |         -91 |          -4.24 |  -90.99999999999991 |  -90.99999999999991 | 2026-02-20 09:00:11.746596 | 2026-02-20 09:02:26.917619
+  7 | 2026-02-21 |       1 |    25571.25 | NIFTY26FEB25550CE |               16602626 | CE          |        25550 | 2026-02-24  | 2026-02-21 10:50:38.60347  |      134.95 |             134.95 |       65 |       65 | BUY        |                            |            |                   | CLOSED       | Paper      |                     |                    | SHORT COVERING |            -120445 |      8771.75 |             |                |                     |                     | 2026-02-21 05:20:38.793065 | 2026-02-21 05:20:38.79307
+
+When a new trade is placed or exited the data must be updated in this table also if it is live trade for different users it must get that perticuar users actual buy or sell price and must be updated in this table. If it is paper trade it can be just the common one can be updated. Also every minute the current price and the Max and Min pNL must be calculated and updated in this table.
+The lot size every thing must be taken from the user table only for placing a new order and to close and existing order it must always refer this user_tade table data only to close the existing trade for that particular user I have a holidays .json file and if it is mentioned as holdiday for the day this application must not run also on any starday and Sunday this must not run 
+
+
