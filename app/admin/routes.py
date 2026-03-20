@@ -1123,28 +1123,13 @@ def _oi_chart_spot(underlying, query_date):
     return 0
 
 
-def _oi_build_strikes_100(spot, available=None):
+def _oi_build_strikes_100(spot):
     """
-    Return 7 strikes: ATM-300, ATM-200, ATM-100, ATM, ATM+100, ATM+200, ATM+300
-    ATM = spot rounded to nearest 100.
-    If 'available' list is given, snap ATM to the nearest strike in that list
-    and pick ±3 neighbours from it.
+    Return 7 strikes exclusively in 100-point steps: 
+    ATM-300, ATM-200, ATM-100, ATM, ATM+100, ATM+200, ATM+300
     """
     step = 100
     atm  = round(spot / step) * step if spot else 23100
-
-    if available:
-        # Snap ATM to nearest strike actually in DB
-        atm = min(available, key=lambda x: abs(x - atm))
-        idx = available.index(atm)
-        lo  = max(0, idx - 3)
-        hi  = min(len(available), idx + 4)
-        picked = available[lo:hi]
-        # Pad to keep 7 if we hit a boundary
-        if len(picked) < 7 and len(available) >= 7:
-            picked = available[:7] if lo == 0 else available[-7:]
-        return picked
-
     return [atm + (i * step) for i in range(-3, 4)]
 
 
@@ -1169,15 +1154,7 @@ def oi_chart():
 
     expiry  = _oi_chart_nearest_expiry(underlying, query_date)
     spot    = _oi_chart_spot(underlying, query_date)
-
-    available_rows = db.session.query(OptionChainData.strike_price).filter(
-        OptionChainData.underlying == underlying,
-        OptionChainData.expiry_date == str(expiry) if expiry else None,
-        func.date(OptionChainData.timestamp) == query_date
-    ).distinct().order_by(OptionChainData.strike_price).all()
-    available = [float(r[0]) for r in available_rows if r[0] is not None]
-
-    strikes = _oi_build_strikes_100(spot, available if available else None)
+    strikes = _oi_build_strikes_100(spot)
 
     return render_template(
         'admin/oi_chart.html',
@@ -1249,7 +1226,7 @@ def oi_chart_data():
         )
 
         # ── 4. Pick 7 strikes around ATM ──────────────────────────────────
-        strikes = _oi_build_strikes_100(spot, available if available else None)
+        strikes = _oi_build_strikes_100(spot)
         current_app.logger.info(f"[OI-CHART] spot={spot}  chosen strikes={[int(s) for s in strikes]}")
 
         # ── 5. Diagnostic counts ──────────────────────────────────────────
