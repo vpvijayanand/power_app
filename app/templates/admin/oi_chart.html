@@ -1,0 +1,602 @@
+{% extends "base.html" %}
+{% block title %}OI Chart – {{ underlying }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* ── Variables ───────────────────────────────────────────────── */
+    :root {
+        --bg-dark: #0d0f14;
+        --bg-card: #13161e;
+        --bg-card2: #1a1e28;
+        --border: #2a2f3e;
+        --accent: #00c4ff;
+        --green: #00d084;
+        --red: #ff4d6a;
+        --yellow: #ffd700;
+        --text: #e2e6f0;
+        --text-dim: #7a8399;
+        --radius: 10px;
+        --shadow: 0 4px 20px rgba(0, 0, 0, .45);
+    }
+
+    body {
+        background: var(--bg-dark);
+        color: var(--text);
+    }
+
+    /* ── Page wrapper ─────────────────────────────────────────────── */
+    .oi-page {
+        padding: 20px 12px 40px;
+        max-width: 1900px;
+        margin: 0 auto;
+    }
+
+    /* ── Header bar ───────────────────────────────────────────────── */
+    .oi-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--bg-card2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px 18px;
+        margin-bottom: 18px;
+    }
+
+    .oi-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: .5px;
+    }
+
+    .oi-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .oi-controls input,
+    .oi-controls select {
+        background: var(--bg-dark);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: .82rem;
+    }
+
+    .oi-controls input:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
+
+    .btn-apply {
+        background: linear-gradient(135deg, #00c4ff, #007bff);
+        border: none;
+        color: #fff;
+        font-weight: 600;
+        border-radius: 6px;
+        padding: 7px 18px;
+        cursor: pointer;
+        font-size: .82rem;
+        transition: opacity .2s;
+    }
+
+    .btn-apply:hover {
+        opacity: .85;
+    }
+
+    /* ── Stats row ────────────────────────────────────────────────── */
+    .oi-stats {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+    }
+
+    .stat-pill {
+        background: var(--bg-card2);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 6px 18px;
+        font-size: .82rem;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .stat-label {
+        color: var(--text-dim);
+    }
+
+    .stat-val {
+        font-weight: 700;
+        color: var(--accent);
+    }
+
+    .refresh-badge {
+        margin-left: auto;
+        font-size: .75rem;
+        color: var(--text-dim);
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 4px 14px;
+    }
+
+    #refresh-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background: var(--green);
+        border-radius: 50%;
+        margin-right: 5px;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1
+        }
+
+        50% {
+            opacity: .3
+        }
+    }
+
+    /* ── Section headers ──────────────────────────────────────────── */
+    .section-title {
+        font-size: .9rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        padding: 0 0 10px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 14px;
+    }
+
+    .section-title.ce {
+        color: var(--red);
+    }
+
+    .section-title.pe {
+        color: var(--green);
+    }
+
+    .section-title.nf {
+        color: var(--accent);
+    }
+
+    /* ── Chart grid ───────────────────────────────────────────────── */
+    .chart-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .chart-grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    @media (max-width: 1200px) {
+        .chart-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .chart-grid-2 {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .chart-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* ── Individual chart card ────────────────────────────────────── */
+    .chart-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 10px 8px;
+        box-shadow: var(--shadow);
+        position: relative;
+        transition: border-color .2s;
+    }
+
+    .chart-card:hover {
+        border-color: var(--accent);
+    }
+
+    .chart-card .card-title {
+        font-size: .72rem;
+        font-weight: 700;
+        letter-spacing: .5px;
+        text-align: center;
+        margin-bottom: 6px;
+    }
+
+    .chart-card.ce-card .card-title {
+        color: var(--red);
+    }
+
+    .chart-card.pe-card .card-title {
+        color: var(--green);
+    }
+
+    .chart-card.nf-card .card-title {
+        color: var(--accent);
+    }
+
+    .chart-card.combo-card .card-title {
+        color: var(--yellow);
+    }
+
+    .chart-card canvas {
+        display: block;
+        width: 100% !important;
+        height: 120px !important;
+    }
+
+    .chart-card.tall canvas {
+        height: 180px !important;
+    }
+
+    /* ── Loading overlay ──────────────────────────────────────────── */
+    .loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(13, 15, 20, .75);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        font-size: 1.1rem;
+        color: var(--accent);
+        letter-spacing: 1px;
+        display: none;
+    }
+
+    .spinner {
+        border: 4px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        width: 36px;
+        height: 36px;
+        animation: spin .8s linear infinite;
+    }
+
+    @keyframes spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="oi-page" id="oi-root">
+
+    <!-- ── Loading ── -->
+    <div class="loading-overlay" id="loader">
+        <div style="text-align:center">
+            <div class="spinner" style="margin:0 auto 14px"></div>
+            Loading OI data…
+        </div>
+    </div>
+
+    <!-- ── Header ── -->
+    <div class="oi-header">
+        <div class="oi-title">⚡ Options OI Chart &nbsp;<span style="font-size:.8rem;color:var(--text-dim);">{{
+                underlying }}</span></div>
+        <form class="oi-controls" id="filter-form" method="get" action="{{ url_for('admin.oi_chart') }}">
+            <label style="font-size:.78rem;color:var(--text-dim);">Date</label>
+            <input type="date" name="date" id="f-date" value="{{ filters.date }}">
+            <label style="font-size:.78rem;color:var(--text-dim);">From</label>
+            <input type="time" name="start_time" id="f-start" value="{{ filters.start_time }}">
+            <label style="font-size:.78rem;color:var(--text-dim);">To</label>
+            <input type="time" name="end_time" id="f-end" value="{{ filters.end_time }}">
+            <button type="submit" class="btn-apply">Apply</button>
+        </form>
+    </div>
+
+    <!-- ── Stats ── -->
+    <div class="oi-stats">
+        <div class="stat-pill">
+            <span class="stat-label">Nifty Spot</span>
+            <span class="stat-val" id="spot-val">{{ spot if spot else '—' }}</span>
+        </div>
+        <div class="stat-pill">
+            <span class="stat-label">Expiry</span>
+            <span class="stat-val">{{ expiry if expiry else '—' }}</span>
+        </div>
+        <div class="stat-pill">
+            <span class="stat-label">Strikes</span>
+            <span class="stat-val">{{ strikes[0]|int }} – {{ strikes[-1]|int }}</span>
+        </div>
+        <div class="refresh-badge">
+            <span id="refresh-dot"></span>
+            Live · refreshes every 60s &nbsp;|&nbsp; <span id="last-refresh">—</span>
+        </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!--  CE Row (7 cards)                                          -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div class="section-title ce">📈 Call (CE) Open Interest</div>
+    <div class="chart-grid" id="ce-grid">
+        {% for strike in strikes %}
+        <div class="chart-card ce-card">
+            <div class="card-title">{{ strike|int }} CE</div>
+            <canvas id="ce-chart-{{ strike|int }}"></canvas>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!--  PE Row (7 cards)                                          -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div class="section-title pe">📉 Put (PE) Open Interest</div>
+    <div class="chart-grid" id="pe-grid">
+        {% for strike in strikes %}
+        <div class="chart-card pe-card">
+            <div class="card-title">{{ strike|int }} PE</div>
+            <canvas id="pe-chart-{{ strike|int }}"></canvas>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
+    <!--  Bottom Row: Nifty Price + Combined OI                     -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div class="section-title nf">🔷 Nifty Price &amp; Combined OI</div>
+    <div class="chart-grid-2">
+        <div class="chart-card nf-card tall">
+            <div class="card-title">NIFTY Price</div>
+            <canvas id="nifty-chart"></canvas>
+        </div>
+        <div class="chart-card combo-card tall">
+            <div class="card-title">Combined OI — CE (reds) &amp; PE (greens)</div>
+            <canvas id="combo-chart"></canvas>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+    /* ================================================================
+       OI Chart – client-side logic
+       ================================================================ */
+    'use strict';
+
+    // ── Config injected from Jinja ──
+    const UNDERLYING = "{{ underlying }}";
+    const STRIKES_INIT = {{ strikes | tojson }};
+    const FILTERS = {
+        date: "{{ filters.date }}",
+        start_time: "{{ filters.start_time }}",
+        end_time: "{{ filters.end_time }}"
+    };
+
+    // ── Colour palettes ──
+    const CE_COLORS = [
+        '#ff1744', '#ff4569', '#ff6384', '#ff7f9e', '#ff9ab8', '#ffb5d0', '#ffcfe8'
+    ];
+    const PE_COLORS = [
+        '#00d084', '#26d994', '#4de2a4', '#73ebb4', '#99f4c4', '#bffdd4', '#e5ffe4'
+    ];
+
+    // ── Chart instances ──
+    const ceCharts = {};
+    const peCharts = {};
+    let niftyChart = null;
+    let comboChart = null;
+
+    // ── Chart.js global defaults ──
+    Chart.defaults.color = '#7a8399';
+    Chart.defaults.borderColor = '#2a2f3e';
+    Chart.defaults.font.family = 'Inter, Segoe UI, sans-serif';
+    Chart.defaults.font.size = 10;
+
+    // ── Default stepped line options ──
+    function steppedDataset(label, data, color, fill = false) {
+        return {
+            label,
+            data,
+            borderColor: color,
+            backgroundColor: fill ? color + '22' : 'transparent',
+            borderWidth: 1.8,
+            pointRadius: 0,
+            tension: 0,
+            stepped: 'before',
+            spanGaps: true,
+            fill,
+        };
+    }
+
+    // ── Create an empty chart ──
+    function mkChart(canvasId, datasets, yMax, yLabel = 'OI') {
+        const ctx = document.getElementById(canvasId);
+        if (!ctx) return null;
+        return new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets },
+            options: {
+                animation: { duration: 300 },
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: datasets.length > 1, position: 'bottom', labels: { boxWidth: 10, padding: 6, font: { size: 9 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toLocaleString('en-IN')}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { maxTicksLimit: 6, maxRotation: 0, font: { size: 9 } },
+                        grid: { color: '#1e2230' }
+                    },
+                    y: {
+                        suggestedMin: 0,
+                        suggestedMax: yMax || undefined,
+                        ticks: { maxTicksLimit: 4, font: { size: 9 } },
+                        grid: { color: '#1e2230' }
+                    }
+                }
+            }
+        });
+    }
+
+    // ── Init all empty charts on page load ──
+    function initCharts() {
+        for (const s of STRIKES_INIT) {
+            const sk = Math.round(s);
+            ceCharts[sk] = mkChart(`ce-chart-${sk}`, [steppedDataset(`${sk} CE`, [], '#ff4d6a')], 0);
+            peCharts[sk] = mkChart(`pe-chart-${sk}`, [steppedDataset(`${sk} PE`, [], '#00d084')], 0);
+        }
+
+        // Nifty chart
+        niftyChart = new Chart(document.getElementById('nifty-chart'), {
+            type: 'line',
+            data: { labels: [], datasets: [steppedDataset('NIFTY', [], '#00c4ff', true)] },
+            options: {
+                animation: { duration: 300 },
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { maxTicksLimit: 8, maxRotation: 0, font: { size: 9 } }, grid: { color: '#1e2230' } },
+                    y: { ticks: { maxTicksLimit: 5, font: { size: 9 } }, grid: { color: '#1e2230' } }
+                }
+            }
+        });
+
+        // Combo chart (built after first fetch)
+        comboChart = new Chart(document.getElementById('combo-chart'), {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: {
+                animation: { duration: 300 },
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, padding: 5, font: { size: 9 } } } },
+                scales: {
+                    x: { ticks: { maxTicksLimit: 8, maxRotation: 0, font: { size: 9 } }, grid: { color: '#1e2230' } },
+                    y: { suggestedMin: 0, ticks: { maxTicksLimit: 4, font: { size: 9 } }, grid: { color: '#1e2230' } }
+                }
+            }
+        });
+    }
+
+    // ── Update charts with fresh data ──
+    function applyData(payload) {
+        const { timestamps, nifty, strikes, strike_list, spot } = payload;
+
+        // Update spot display
+        if (spot) document.getElementById('spot-val').textContent = spot.toLocaleString('en-IN');
+
+        // ── Compute global Y-axis maxes ──
+        let ceGlobalMax = 0;
+        let peGlobalMax = 0;
+        for (const sk of strike_list) {
+            const d = strikes[sk] || {};
+            (d.ce_oi || []).forEach(v => { if (v != null && v > ceGlobalMax) ceGlobalMax = v; });
+            (d.pe_oi || []).forEach(v => { if (v != null && v > peGlobalMax) peGlobalMax = v; });
+        }
+        const cePad = Math.ceil(ceGlobalMax * 1.08);
+        const pePad = Math.ceil(peGlobalMax * 1.08);
+
+        // ── Update per-strike CE / PE charts ──
+        strike_list.forEach((sk, idx) => {
+            const intSk = parseInt(sk);
+            const d = strikes[sk] || {};
+
+            // CE
+            if (ceCharts[intSk]) {
+                const c = ceCharts[intSk];
+                c.data.labels = timestamps;
+                c.data.datasets[0].data = d.ce_oi || [];
+                c.options.scales.y.suggestedMax = cePad || undefined;
+                c.update('none');
+            }
+            // PE
+            if (peCharts[intSk]) {
+                const c = peCharts[intSk];
+                c.data.labels = timestamps;
+                c.data.datasets[0].data = d.pe_oi || [];
+                c.options.scales.y.suggestedMax = pePad || undefined;
+                c.update('none');
+            }
+        });
+
+        // ── Nifty chart ──
+        if (niftyChart) {
+            niftyChart.data.labels = timestamps;
+            niftyChart.data.datasets[0].data = nifty;
+            niftyChart.update('none');
+        }
+
+        // ── Combo chart – rebuild datasets ──
+        if (comboChart) {
+            const comboDS = [];
+            strike_list.forEach((sk, idx) => {
+                const d = strikes[sk] || {};
+                comboDS.push(steppedDataset(`${sk} CE`, d.ce_oi || [], CE_COLORS[idx] || '#ff4d6a'));
+                comboDS.push(steppedDataset(`${sk} PE`, d.pe_oi || [], PE_COLORS[idx] || '#00d084'));
+            });
+            comboChart.data.labels = timestamps;
+            comboChart.data.datasets = comboDS;
+            comboChart.update('none');
+        }
+
+        // ── Refresh timestamp ──
+        const now = new Date();
+        document.getElementById('last-refresh').textContent =
+            now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ── Fetch data from API ──
+    function fetchData() {
+        const form = document.getElementById('filter-form');
+        const date = document.getElementById('f-date').value || FILTERS.date;
+        const start_time = document.getElementById('f-start').value || FILTERS.start_time;
+        const end_time = document.getElementById('f-end').value || FILTERS.end_time;
+
+        const url = `/admin/oi-chart-data?underlying=${UNDERLYING}&date=${date}&start_time=${start_time}&end_time=${end_time}`;
+
+        fetch(url)
+            .then(r => r.json())
+            .then(payload => {
+                if (payload.error) { console.error('OI API error:', payload.error); return; }
+                applyData(payload);
+            })
+            .catch(e => console.error('Fetch error:', e));
+    }
+
+    // ── Bootstrap ──
+    document.addEventListener('DOMContentLoaded', () => {
+        initCharts();
+        fetchData();
+        setInterval(fetchData, 60_000);
+    });
+</script>
+{% endblock %}

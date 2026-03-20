@@ -1079,3 +1079,197 @@ def export_users():
     except Exception as e:
         flash(f'Error exporting data: {str(e)}', 'danger')
         return redirect(url_for('admin.dashboard'))
+
+
+# ===================================================================
+# Helpers shared by OI Chart routes
+# ===================================================================
+def _oi_chart_nearest_expiry(underlying='NIFTY'):
+    """Return nearest future expiry from Instruments table."""
+    today = datetime.now().date()
+    latest_fetch = db.session.query(func.max(Instrument.fetch_date)).filter(
+        Instrument.name == underlying,
+        Instrument.segment == 'NFO-OPT'
+    ).scalar()
+    if not latest_fetch:
+        return None
+    exp = db.session.query(func.min(Instrument.expiry)).filter(
+        Instrument.name == underlying,
+        Instrument.segment == 'NFO-OPT',
+        Instrument.expiry >= today,
+        Instrument.fetch_date == latest_fetch
+    ).scalar()
+    return exp
+
+
+def _oi_chart_spot(underlying, query_date):
+    """Return latest Nifty close for the given date from IndexData."""
+    latest_ts = db.session.query(func.max(IndexData.timestamp)).filter(
+        IndexData.symbol == underlying,
+        func.date(IndexData.timestamp) == query_date
+    ).scalar()
+    if latest_ts:
+        row = db.session.query(IndexData.close).filter(
+            IndexData.symbol == underlying,
+            IndexData.timestamp == latest_ts
+        ).scalar()
+        return round(float(row), 2) if row else 0
+    return 0
+
+
+def _oi_build_strikes(spot, step=100, count=3):
+    """Build 7 equidistant strikes around ATM (nearest 100)."""
+    atm = round(spot / step) * step if spot else 25000
+    return [atm + (i * step) for i in range(-count, count + 1)]
+
+
+# ===================================================================
+# ROUTE: OI Chart page
+# ===================================================================
+@admin_bp.route('/oi-chart')
+@login_required
+@admin_required
+def oi_chart():
+    underlying = 'NIFTY'
+    today = datetime.now().date()
+    date_str = request.args.get('date', today.strftime('%Y-%m-%d'))
+    start_time = request.args.get('start_time', '09:15')
+    end_time = request.args.get('end_time', '15:30')
+
+    try:
+        query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        query_date = today
+        date_str = query_date.strftime('%Y-%m-%d')
+
+    expiry = _oi_chart_nearest_expiry(underlying)
+    spot = _oi_chart_spot(underlying, query_date)
+    strikes = _oi_build_strikes(spot)
+
+    return render_template(
+        'admin/oi_chart.html',
+        underlying=underlying,
+        expiry=str(expiry) if expiry else '',
+        spot=spot,
+        strikes=strikes,
+        filters={
+            'date': date_str,
+            'start_time': start_time,
+            'end_time': end_time,
+        }
+    )
+
+
+# ===================================================================
+# API: OI Chart data (JSON for Chart.js)
+# ===================================================================
+@admin_bp.route('/oi-chart-data')
+@login_required
+@admin_required
+def oi_chart_data():
+    underlying = request.args.get('underlying', 'NIFTY')
+    date_str = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    start_time_str = request.args.get('start_time', '09:15')
+    end_time_str = request.args.get('end_time', '15:30')
+
+    try:
+        query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        query_date = datetime.now().date()
+
+    # Build datetime boundaries
+    try:
+        market_open = datetime.combine(query_date, datetime.strptime(start_time_str, '%H:%M').time())
+        market_close = datetime.combine(query_date, datetime.strptime(end_time_str, '%H:%M').time())
+    except ValueError:
+        market_open = datetime.combine(query_date, datetime.strptime('09:15', '%H:%M').time())
+        market_close = datetime.combine(query_date, datetime.strptime('15:30', '%H:%M').time())
+
+    expiry = _oi_chart_nearest_expiry(underlying)
+    spot = _oi_chart_spot(underlying, query_date)
+    strikes = _oi_build_strikes(spot)
+
+    # ------------------------------------------------------------------
+    # 1. Fetch all OI rows for the 7 strikes in the time window
+    # ------------------------------------------------------------------
+    rows = db.session.query(
+        OptionChainData.timestamp,
+        OptionChainData.strike_price,
+        OptionChainData.ce_oi,
+        OptionChainData.pe_oi,
+    ).filter(
+        OptionChainData.underlying == underlying,
+        OptionChainData.expiry_date == expiry,
+        OptionChainData.strike_price.in_(strikes),
+        OptionChainData.timestamp >= market_open,
+        OptionChainData.timestamp <= market_close,
+    ).order_by(OptionChainData.timestamp).all()
+
+    # ------------------------------------------------------------------
+    # 2. Collect all unique timestamps (as HH:MM strings)
+    # ------------------------------------------------------------------
+    timestamps_set = sorted(set(r.timestamp.strftime('%H:%M') for r in rows))
+
+    # ------------------------------------------------------------------
+    # 3. Build per-strike OI series indexed by timestamp
+    # ------------------------------------------------------------------
+    # strike_map[strike][ts] = {ce_oi, pe_oi}
+    strike_map = {str(int(s)): {} for s in strikes}
+    for r in rows:
+        sk = str(int(r.strike_price))
+        ts = r.timestamp.strftime('%H:%M')
+        if sk in strike_map:
+            strike_map[sk][ts] = {
+                'ce_oi': r.ce_oi or 0,
+                'pe_oi': r.pe_oi or 0,
+            }
+
+    # Convert to lists aligned with timestamps_set
+    strikes_data = {}
+    for sk in strike_map:
+        ce_series = []
+        pe_series = []
+        for ts in timestamps_set:
+            entry = strike_map[sk].get(ts, {})
+            ce_series.append(entry.get('ce_oi', None))
+            pe_series.append(entry.get('pe_oi', None))
+        strikes_data[sk] = {'ce_oi': ce_series, 'pe_oi': pe_series}
+
+    # ------------------------------------------------------------------
+    # 4. Nifty price series
+    # ------------------------------------------------------------------
+    index_rows = db.session.query(
+        IndexData.timestamp,
+        IndexData.close,
+    ).filter(
+        IndexData.symbol == underlying,
+        func.date(IndexData.timestamp) == query_date,
+        IndexData.timestamp >= market_open,
+        IndexData.timestamp <= market_close,
+    ).order_by(IndexData.timestamp).all()
+
+    nifty_map = {r.timestamp.strftime('%H:%M'): round(float(r.close), 2) for r in index_rows}
+
+    # Merge Nifty timestamps with OI timestamps for a full timeline
+    all_timestamps = sorted(set(timestamps_set) | set(nifty_map.keys()))
+    nifty_series = [nifty_map.get(ts, None) for ts in all_timestamps]
+
+    # Re-align OI series to all_timestamps
+    for sk in strikes_data:
+        ce_aligned = []
+        pe_aligned = []
+        for ts in all_timestamps:
+            entry = strike_map[sk].get(ts, {})
+            ce_aligned.append(entry.get('ce_oi', None))
+            pe_aligned.append(entry.get('pe_oi', None))
+        strikes_data[sk] = {'ce_oi': ce_aligned, 'pe_oi': pe_aligned}
+
+    return jsonify({
+        'timestamps': all_timestamps,
+        'nifty': nifty_series,
+        'strikes': strikes_data,
+        'strike_list': [str(int(s)) for s in strikes],
+        'spot': spot,
+        'expiry': str(expiry) if expiry else '',
+    })
+
