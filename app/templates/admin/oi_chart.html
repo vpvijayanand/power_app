@@ -394,11 +394,25 @@
     };
 
     // ── Colour palettes ──
+    // CE → 7 distinct saturated REDS (no pink / light tones)
     const CE_COLORS = [
-        '#ff1744', '#ff4569', '#ff6384', '#ff7f9e', '#ff9ab8', '#ffb5d0', '#ffcfe8'
+        '#cc0000',   // deep crimson
+        '#e62200',   // dark red-orange
+        '#ff3300',   // tomato red
+        '#b30000',   // very dark red
+        '#ff5500',   // orange-red
+        '#990000',   // maroon
+        '#ff0000',   // pure red
     ];
+    // PE → 7 distinct saturated GREENS (no light / washed-out tones)
     const PE_COLORS = [
-        '#00d084', '#26d994', '#4de2a4', '#73ebb4', '#99f4c4', '#bffdd4', '#e5ffe4'
+        '#006400',   // dark green
+        '#008000',   // medium green
+        '#009900',   // classic green
+        '#00b300',   // bright mid-green
+        '#00cc00',   // lime green
+        '#007700',   // forest green
+        '#00e600',   // vivid green
     ];
 
     // ── Chart instances ──
@@ -576,20 +590,48 @@
 
     // ── Fetch data from API ──
     function fetchData() {
-        const form = document.getElementById('filter-form');
         const date = document.getElementById('f-date').value || FILTERS.date;
         const start_time = document.getElementById('f-start').value || FILTERS.start_time;
         const end_time = document.getElementById('f-end').value || FILTERS.end_time;
 
         const url = `/admin/oi-chart-data?underlying=${UNDERLYING}&date=${date}&start_time=${start_time}&end_time=${end_time}`;
 
+        console.log('[OI-CHART] Fetching:', url);
+
         fetch(url)
             .then(r => r.json())
             .then(payload => {
-                if (payload.error) { console.error('OI API error:', payload.error); return; }
+                if (payload.error) {
+                    console.error('[OI-CHART] API returned error:', payload.error);
+                    return;
+                }
+
+                // ── Full debug dump ──
+                const dbg = payload._debug || {};
+                console.group('[OI-CHART] API Response Debug');
+                console.log('Expiry used        :', dbg.expiry_used);
+                console.log('Strikes queried    :', dbg.strikes_queried);
+                console.log('Window open        :', dbg.window_open);
+                console.log('Window close       :', dbg.window_close);
+                console.log('IndexData rows     :', dbg.any_index_rows, '   (0 = no NIFTY price data for this date)');
+                console.log('OptionChain rows   :', dbg.any_oc_rows, '   (0 = no OI data at all for this date)');
+                console.log('OI rows in window  :', dbg.oi_rows_fetched, '   (0 = strikes not matched or outside window)');
+                console.log('Nifty rows in win  :', dbg.nifty_rows_fetched);
+                console.log('OC expiries today  :', dbg.oc_expiries);
+                console.log('OC strikes sample  :', dbg.oc_strikes_sample);
+                console.log('Timestamps count   :', (payload.timestamps || []).length);
+                console.log('Nifty non-null pts :', (payload.nifty || []).filter(v => v !== null).length);
+                for (const sk of (payload.strike_list || [])) {
+                    const d = (payload.strikes || {})[sk] || {};
+                    const ceNonNull = (d.ce_oi || []).filter(v => v !== null).length;
+                    const peNonNull = (d.pe_oi || []).filter(v => v !== null).length;
+                    console.log(`  Strike ${sk} → CE pts: ${ceNonNull}  PE pts: ${peNonNull}`);
+                }
+                console.groupEnd();
+
                 applyData(payload);
             })
-            .catch(e => console.error('Fetch error:', e));
+            .catch(e => console.error('[OI-CHART] Fetch error:', e));
     }
 
     // ── Bootstrap ──
