@@ -1,4 +1,4 @@
-from flask import render_template, redirect, url_for, flash, request, jsonify
+from flask import render_template, redirect, url_for, flash, request, jsonify, current_app
 from app.auth.decorators import login_required, admin_required, get_current_user
 from app.models import User, Instrument, OptionChainData, IndexData, db
 from sqlalchemy import func
