@@ -1262,34 +1262,68 @@ def oi_chart_data():
             f"[OI-CHART] OC expiries={oc_expiry_list}  strikes sample={oc_strikes_sample}{more_strikes_suffix}"
         )
 
-        rows = db.session.query(
+        # ── Main OI query ──
+        # Cast expiry to string just in case SQLite fails date object matching
+        str_expiry = expiry.strftime('%Y-%m-%d') if isinstance(expiry, datetime) or hasattr(expiry, 'strftime') else str(expiry)
+        
+        # Don't use >= timestamp in SQLite, it often fails depending on text/datetime type.
+        # Just grab the 7 strikes for the whole day, then filter in python.
+        raw_rows = db.session.query(
             OptionChainData.timestamp,
             OptionChainData.strike_price,
             OptionChainData.ce_oi,
             OptionChainData.pe_oi,
         ).filter(
             OptionChainData.underlying == underlying,
-            OptionChainData.expiry_date == expiry,
+            OptionChainData.expiry_date == str_expiry,
             OptionChainData.strike_price.in_(strikes),
-            OptionChainData.timestamp >= market_open,
-            OptionChainData.timestamp <= market_close,
+            func.date(OptionChainData.timestamp) == query_date
         ).order_by(OptionChainData.timestamp).all()
 
-        current_app.logger.info(f"[OI-CHART] OI rows in window = {len(rows)}")
-        if rows:
-            current_app.logger.info(
-                f"[OI-CHART] First OI row ts={rows[0].timestamp} "
-                f"strike={rows[0].strike_price} ce_oi={rows[0].ce_oi}"
-            )
+        rows = []
+        for r in raw_rows:
+            # handle string vs datetime from sqlite
+            if isinstance(r.timestamp, str):
+                try:
+                    ts_val = datetime.strptime(r.timestamp, '%Y-%m-%d %H:%M:%S')
+                except ValueError:
+                    try:
+                        ts_val = datetime.strptime(r.timestamp, '%Y-%m-%dT%H:%M:%S')
+                    except ValueError:
+                        continue
+            else:
+                ts_val = r.timestamp
+            
+            if market_open <= ts_val <= market_close:
+                # Add parsed ts for easy use
+                r_dict = {
+                    'parsed_ts': ts_val,
+                    'strike_price': r.strike_price,
+                    'ce_oi': r.ce_oi or 0,
+                    'pe_oi': r.pe_oi or 0
+                }
+                rows.append(r_dict)
 
-        timestamps_set = sorted(set(r.timestamp.strftime('%H:%M') for r in rows))
-
+        current_app.logger.info(f"[OI-CHART] OI rows in window after Python filter = {len(rows)}")
+        
+        # User requested: "data at 9:15 OI must be compared with every minute data" -> Change in OI chart
+        initial_oi = {} # baseline from 9:15
         strike_map = {str(int(s)): {} for s in strikes}
+        timestamps_set = sorted(set(r['parsed_ts'].strftime('%H:%M') for r in rows))
+        
         for r in rows:
-            sk = str(int(r.strike_price))
-            ts = r.timestamp.strftime('%H:%M')
+            sk = str(int(r['strike_price']))
+            ts_str = r['parsed_ts'].strftime('%H:%M')
+            
+            if sk not in initial_oi:
+                initial_oi[sk] = {'ce': r['ce_oi'], 'pe': r['pe_oi']}
+                
+            # Chart the difference (Change in OI)
+            ce_diff = r['ce_oi'] - initial_oi[sk]['ce']
+            pe_diff = r['pe_oi'] - initial_oi[sk]['pe']
+            
             if sk in strike_map:
-                strike_map[sk][ts] = {'ce_oi': r.ce_oi or 0, 'pe_oi': r.pe_oi or 0}
+                strike_map[sk][ts_str] = {'ce_oi': ce_diff, 'pe_oi': pe_diff}
 
         strikes_data = {}
         for sk in strike_map:
