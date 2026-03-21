@@ -1354,6 +1354,18 @@ def oi_chart_data():
                 'pe_oi': [strike_snapshots[sk].get(ts, {}).get('pe_oi') for ts in all_timestamps],
             }
 
+        # Fetch sample of expiries and strikes for the JS debug dump
+        debug_oc_exp = db.session.query(OptionChainData.expiry_date).filter(
+            func.date(OptionChainData.timestamp) == query_date
+        ).distinct().all()
+        debug_expiries = [str(e[0]) for e in debug_oc_exp if e[0]]
+
+        debug_oc_str = db.session.query(OptionChainData.strike_price).filter(
+            func.date(OptionChainData.timestamp) == query_date,
+            OptionChainData.expiry_date == expiry_str
+        ).distinct().order_by(OptionChainData.strike_price).all()
+        debug_strikes = [float(s[0]) for s in debug_oc_str[:20] if s[0] is not None]
+
         return jsonify({
             'timestamps':  all_timestamps,
             'nifty':       nifty_series,
@@ -1362,19 +1374,17 @@ def oi_chart_data():
             'spot':        spot,
             'expiry':      expiry_str,
             '_debug': {
-                'any_index_rows':          any_index,
-                'any_oc_total':            any_oc_total,
-                'any_oc_for_expiry':       any_oc_expiry,
-                'any_oc_expiry_strikes':   any_oc_strikes,   # ← KEY: if still 0, strikes truly missing
-                'expiry_used':             expiry_str,
-                'available_strikes_count': len(available),
-                'available_strikes_sample':available[:20],
-                'strikes_queried':         [int(s) for s in strikes],
-                'oi_rows_raw':             len(raw_rows),
-                'oi_rows_in_window':       len(rows),
-                'nifty_rows_in_window':    len(index_rows),
-                'window_open':             str(market_open),
-                'window_close':            str(market_close),
+                'any_index_rows':     any_index,
+                'any_oc_rows':        any_oc_total,          # ← Matches frontend JS
+                'oc_expiries':        debug_expiries,        # ← Matches frontend JS
+                'oc_strikes_sample':  debug_strikes,         # ← Matches frontend JS
+                'expiry_used':        expiry_str,
+                'strikes_queried':    [int(s) for s in strikes],
+                'oi_rows_fetched':    len(rows),             # ← Matches frontend JS 
+                'nifty_rows_fetched': len(index_rows),       # ← Matches frontend JS
+                'raw_rows_found':     len(raw_rows),         
+                'window_open':        str(market_open),
+                'window_close':       str(market_close),
             }
         })
 

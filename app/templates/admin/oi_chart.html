@@ -246,11 +246,31 @@
     .chart-card canvas {
         display: block;
         width: 100% !important;
-        height: 120px !important;
+        height: 360px !important;
     }
 
     .chart-card.tall canvas {
-        height: 180px !important;
+        height: 360px !important;
+    }
+
+    .swing-badge {
+        display: inline-block;
+        font-size: .65rem;
+        font-weight: 700;
+        margin-left: 5px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        vertical-align: middle;
+    }
+
+    .swing-up {
+        color: #00cc44;
+        background: #00cc4420;
+    }
+
+    .swing-down {
+        color: #ff4d6a;
+        background: #ff4d6a20;
     }
 
     /* ── Loading overlay ──────────────────────────────────────────── */
@@ -332,13 +352,31 @@
     </div>
 
     <!-- ────────────────────────────────────────────────────────── -->
+    <!--  TOP: Nifty Price + Combined OI                            -->
+    <!-- ────────────────────────────────────────────────────────── -->
+    <div class="section-title nf">🔷 Nifty Price &amp; Combined OI</div>
+    <div class="chart-grid-2">
+        <div class="chart-card nf-card tall">
+            <div class="card-title">NIFTY Price</div>
+            <canvas id="nifty-chart"></canvas>
+        </div>
+        <div class="chart-card combo-card tall">
+            <div class="card-title">Combined OI — CE (reds) &amp; PE (greens)</div>
+            <canvas id="combo-chart"></canvas>
+        </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────────────────── -->
     <!--  CE Row (7 cards)                                          -->
     <!-- ────────────────────────────────────────────────────────── -->
     <div class="section-title ce">📈 Call (CE) Open Interest</div>
     <div class="chart-grid" id="ce-grid">
         {% for strike in strikes %}
         <div class="chart-card ce-card">
-            <div class="card-title">{{ strike|int }} CE</div>
+            <div class="card-title">
+                {{ strike|int }} CE
+                <span id="ce-swing-{{ strike|int }}" class="swing-badge"></span>
+            </div>
             <canvas id="ce-chart-{{ strike|int }}"></canvas>
         </div>
         {% endfor %}
@@ -351,25 +389,13 @@
     <div class="chart-grid" id="pe-grid">
         {% for strike in strikes %}
         <div class="chart-card pe-card">
-            <div class="card-title">{{ strike|int }} PE</div>
+            <div class="card-title">
+                {{ strike|int }} PE
+                <span id="pe-swing-{{ strike|int }}" class="swing-badge"></span>
+            </div>
             <canvas id="pe-chart-{{ strike|int }}"></canvas>
         </div>
         {% endfor %}
-    </div>
-
-    <!-- ────────────────────────────────────────────────────────── -->
-    <!--  Bottom Row: Nifty Price + Combined OI                     -->
-    <!-- ────────────────────────────────────────────────────────── -->
-    <div class="section-title nf">🔷 Nifty Price &amp; Combined OI</div>
-    <div class="chart-grid-2">
-        <div class="chart-card nf-card tall">
-            <div class="card-title">NIFTY Price</div>
-            <canvas id="nifty-chart"></canvas>
-        </div>
-        <div class="chart-card combo-card tall">
-            <div class="card-title">Combined OI — CE (reds) &amp; PE (greens)</div>
-            <canvas id="combo-chart"></canvas>
-        </div>
     </div>
 
 </div>
@@ -521,6 +547,50 @@
         });
     }
 
+    // ── Compute % change from the last significant swing high or low ──
+    function swingPct(series) {
+        // Filter out nulls
+        const vals = series.filter(v => v !== null && v !== undefined);
+        if (vals.length < 3) return null;
+
+        const last = vals[vals.length - 1];
+
+        // Find the most recent local peak or trough in the last 20 points
+        const window = vals.slice(-20);
+        let swingRef = window[0];
+        let swingDir = null; // 'up' or 'down'
+
+        for (let i = 1; i < window.length - 1; i++) {
+            if (window[i] > window[i - 1] && window[i] > window[i + 1]) {
+                // local high
+                if (swingDir !== 'up' || Math.abs(window[i] - swingRef) > Math.abs(swingRef)) {
+                    swingRef = window[i];
+                    swingDir = 'up';
+                }
+            } else if (window[i] < window[i - 1] && window[i] < window[i + 1]) {
+                // local low
+                if (swingDir !== 'down' || Math.abs(window[i] - swingRef) > Math.abs(swingRef)) {
+                    swingRef = window[i];
+                    swingDir = 'down';
+                }
+            }
+        }
+
+        if (swingRef === 0 || swingRef === null) return null;
+        const pct = ((last - swingRef) / Math.abs(swingRef)) * 100;
+        return pct;
+    }
+
+    function updateSwingLabel(elementId, series) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        const pct = swingPct(series);
+        if (pct === null) { el.textContent = ''; return; }
+        const sign = pct >= 0 ? '+' : '';
+        el.textContent = `${sign}${pct.toFixed(1)}%`;
+        el.className = 'swing-badge ' + (pct >= 0 ? 'swing-up' : 'swing-down');
+    }
+
     // ── Update charts with fresh data ──
     function applyData(payload) {
         const { timestamps, nifty, strikes, strike_list, spot } = payload;
@@ -528,16 +598,16 @@
         // Update spot display
         if (spot) document.getElementById('spot-val').textContent = spot.toLocaleString('en-IN');
 
-        // ── Compute global Y-axis maxes ──
-        let ceGlobalMax = 0;
-        let peGlobalMax = 0;
+        // ── Compute global Y-axis maxes (absolute value for change-in-OI which can go negative) ──
+        let ceAbsMax = 0;
+        let peAbsMax = 0;
         for (const sk of strike_list) {
             const d = strikes[sk] || {};
-            (d.ce_oi || []).forEach(v => { if (v != null && v > ceGlobalMax) ceGlobalMax = v; });
-            (d.pe_oi || []).forEach(v => { if (v != null && v > peGlobalMax) peGlobalMax = v; });
+            (d.ce_oi || []).forEach(v => { if (v != null && Math.abs(v) > ceAbsMax) ceAbsMax = Math.abs(v); });
+            (d.pe_oi || []).forEach(v => { if (v != null && Math.abs(v) > peAbsMax) peAbsMax = Math.abs(v); });
         }
-        const cePad = Math.ceil(ceGlobalMax * 1.08);
-        const pePad = Math.ceil(peGlobalMax * 1.08);
+        const cePad = Math.ceil(ceAbsMax * 1.08);
+        const pePad = Math.ceil(peAbsMax * 1.08);
 
         // ── Update per-strike CE / PE charts ──
         strike_list.forEach((sk, idx) => {
@@ -550,16 +620,21 @@
                 c.data.labels = timestamps;
                 c.data.datasets[0].data = d.ce_oi || [];
                 c.options.scales.y.suggestedMax = cePad || undefined;
+                c.options.scales.y.suggestedMin = -cePad || undefined;
                 c.update('none');
             }
+            updateSwingLabel(`ce-swing-${intSk}`, d.ce_oi || []);
+
             // PE
             if (peCharts[intSk]) {
                 const c = peCharts[intSk];
                 c.data.labels = timestamps;
                 c.data.datasets[0].data = d.pe_oi || [];
                 c.options.scales.y.suggestedMax = pePad || undefined;
+                c.options.scales.y.suggestedMin = -pePad || undefined;
                 c.update('none');
             }
+            updateSwingLabel(`pe-swing-${intSk}`, d.pe_oi || []);
         });
 
         // ── Nifty chart ──
