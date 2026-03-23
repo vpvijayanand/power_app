@@ -28,8 +28,8 @@ token_map = {}
 
 # ATM strike range (points from spot price)
 ATM_RANGE = {
-    'NIFTY':     4000,   # ±4000 points from spot
-    'BANKNIFTY': 6000    # ±6000 points from spot
+    'NIFTY':     1000,   # ±4000 points from spot
+    'BANKNIFTY': 2000    # ±6000 points from spot
 }
 
 

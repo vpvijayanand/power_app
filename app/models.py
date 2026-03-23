@@ -1,6 +1,7 @@
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.dialects.postgresql import JSONB
 
 db = SQLAlchemy()
 
@@ -221,3 +222,31 @@ class UserTrade(db.Model):
 
     def __repr__(self):
         return f'<UserTrade {self.trade_symbol} {self.user_id} {self.trade_status}>'
+
+
+class NiftyPattern(db.Model):
+    __tablename__ = 'nifty_patterns'
+    id = db.Column(db.Integer, primary_key=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
+    pattern_type = db.Column(db.String(30), nullable=False, index=True)
+    first_seen_date = db.Column(db.Date, nullable=False, index=True)
+    first_seen_open = db.Column(db.Float)
+    first_seen_close = db.Column(db.Float)
+    similar_count = db.Column(db.Integer, nullable=False, default=1, index=True)
+    last_seen_date = db.Column(db.Date)
+    normalized_series = db.Column(JSONB, nullable=False)
+    deviation_pct = db.Column(db.Float, nullable=False, index=True)
+    open_close_chg_pct = db.Column(db.Float)
+    max_drawup_pct = db.Column(db.Float)
+    max_drawdown_pct = db.Column(db.Float)
+    close_vs_range_pct = db.Column(db.Float)
+    adx_at_open = db.Column(db.Float)
+    supertrend_dir = db.Column(db.Integer)
+    super_power = db.Column(db.String(20))
+    similar_dates = db.Column(JSONB, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<NiftyPattern {self.symbol} {self.pattern_type} id={self.id}>'
+

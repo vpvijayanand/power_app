@@ -1,0 +1,294 @@
+{% extends 'base.html' %}
+
+{% block title %}Live Pattern Match | AlgoTrade{% endblock %}
+
+{% block extra_css %}
+<style>
+    .patterns-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .pattern-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .pattern-card {
+            background: #2a2a2a;
+            color: #fff;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+    }
+
+    .pattern-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .pattern-type {
+        font-weight: bold;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+
+    .type-UP_TREND { background: #d4edda; color: #155724; }
+    .type-DOWN_TREND { background: #f8d7da; color: #721c24; }
+    .type-REVERSAL_UP { background: #d1ecf1; color: #0c5460; }
+    .type-REVERSAL_DOWN { background: #fff3cd; color: #856404; }
+    .type-SIDEWAYS { background: #e2e3e5; color: #383d41; }
+    .type-VOLATILE { background: #cce5ff; color: #004085; }
+
+    .chart-container, .main-chart-container {
+        width: 100%;
+        margin: 10px 0;
+    }
+    
+    .chart-container { height: 150px; }
+    .main-chart-container { height: 250px; }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 10px 20px;
+        font-size: 0.9rem;
+    }
+
+    .metric-value { font-weight: bold; }
+    .text-green { color: #28a745; }
+    .text-red { color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Live Pattern Match (Today vs History)</h2>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4" style="background:var(--card-bg, #fff); border-radius:8px; padding:15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <form method="GET" action="{{ url_for('admin.live_pattern_match') }}" class="d-flex" style="gap: 15px; flex-wrap: wrap; align-items: flex-end;">
+            <div>
+                <label class="form-label" style="display:block; margin-bottom:5px;">Symbol</label>
+                <select name="symbol" class="form-control" style="padding:8px; border-radius:4px; border:1px solid #ccc;">
+                    {% for sym in symbols %}
+                    <option value="{{ sym }}" {% if filters.symbol == sym %}selected{% endif %}>{{ sym }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div>
+                <label class="form-label" style="display:block; margin-bottom:5px;">Date</label>
+                <input type="date" name="date" class="form-control" value="{{ filters.date }}" style="padding:8px; border-radius:4px; border:1px solid #ccc;">
+            </div>
+
+            <div>
+                <label class="form-label" style="display:block; margin-bottom:5px;">Start Time</label>
+                <input type="time" name="start_time" class="form-control" value="{{ filters.start_time }}" style="padding:8px; border-radius:4px; border:1px solid #ccc;">
+            </div>
+
+            <div>
+                <label class="form-label" style="display:block; margin-bottom:5px;">End Time</label>
+                <input type="time" name="end_time" class="form-control" value="{{ filters.end_time }}" style="padding:8px; border-radius:4px; border:1px solid #ccc;">
+            </div>
+
+            <div>
+                <label class="form-label" style="display:block; margin-bottom:5px;">Min Similarity (%)</label>
+                <input type="number" step="0.1" name="threshold" class="form-control" value="{{ filters.threshold }}" style="padding:8px; border-radius:4px; border:1px solid #ccc; width: 100px;">
+            </div>
+
+            <div>
+                <button type="submit" class="btn btn-primary" style="padding:9px 20px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer;">Analyze</button>
+            </div>
+        </form>
+    </div>
+
+    {% if today_curve %}
+    <!-- Today's Curve -->
+    <div class="card mb-5" style="background:var(--card-bg, #fff); border-radius:8px; padding:20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h4 style="margin-top:0;">{{ filters.symbol }} Shape on {{ filters.date }} ({{ filters.start_time }} to {{ filters.end_time }})</h4>
+        
+        <div class="metrics-grid mb-3" style="display: flex; gap: 30px; margin-top: 15px;">
+            <div>Type: <span class="pattern-type type-{{ today_stats.pattern_type }}">{{ today_stats.pattern_type }}</span></div>
+            <div>Candles Analyzed: <span class="metric-value">{{ today_stats.candles }}</span></div>
+            <div>Shape Complexity: <span class="metric-value">{{ today_stats.complexity }}</span></div>
+            <div>Deviation: <span class="metric-value">{{ today_stats.deviation_pct }}%</span></div>
+            <div>Open→Close Δ: <span class="metric-value {% if today_stats.open_close_chg_pct > 0 %}text-green{% elif today_stats.open_close_chg_pct < 0 %}text-red{% endif %}">{{ today_stats.open_close_chg_pct }}%</span></div>
+        </div>
+
+        <div class="main-chart-container">
+            <canvas id="today-chart" data-series='{{ today_curve | tojson }}'></canvas>
+        </div>
+    </div>
+    
+    <hr>
+    <h3>Highest Similarity Historical Matches (DTW ≥ {{ filters.threshold }}%)</h3>
+
+    <!-- Patterns Grid -->
+    {% if matches %}
+    <div class="patterns-grid mb-5">
+        {% for match in matches %}
+        {% set pattern = match.pattern %}
+        <div class="pattern-card">
+            <div class="pattern-header">
+                <div>
+                    <strong>Hist. ID #{{ pattern.id }}</strong> 
+                </div>
+                <div>
+                    <span class="badge" style="background:#007bff; color:white; padding:4px 8px; border-radius:4px; font-size:0.9rem; font-weight:bold;">
+                        {{ match.similarity }}% Match
+                    </span>
+                </div>
+            </div>
+            
+            <div class="chart-container">
+                <!-- Data series embeds historical pattern AND todays pattern to compare visually -->
+                <canvas id="chart-{{ pattern.id }}" 
+                        data-historical='{{ pattern.normalized_series | tojson }}'
+                        data-today='{{ today_curve | tojson }}'></canvas>
+            </div>
+
+            <div class="metrics-grid">
+                <div>First Seen:</div>
+                <div class="metric-value">{{ pattern.first_seen_date }}</div>
+                
+                <div>Dev Pct:</div>
+                <div class="metric-value">{{ pattern.deviation_pct }}%</div>
+                
+                <div>Δ Close:</div>
+                <div class="metric-value {% if pattern.open_close_chg_pct > 0 %}text-green{% elif pattern.open_close_chg_pct < 0 %}text-red{% endif %}">
+                    {{ pattern.open_close_chg_pct }}%
+                </div>
+                
+                <div>Supertrend:</div>
+                <div class="metric-value">
+                    {% if pattern.supertrend_dir == 1 %}
+                    <span class="text-green">BUY (▲)</span>
+                    {% elif pattern.supertrend_dir == -1 %}
+                    <span class="text-red">SELL (▼)</span>
+                    {% else %}
+                    -
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-warning mt-3">
+        No stored patterns matched this day's curve with >= {{ filters.threshold }}% similarity. 
+        Try lowering the threshold or generating more historical patterns in the Engine.
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const isDarkMode = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const textColor = isDarkMode ? '#aaa' : '#666';
+
+    Chart.defaults.color = textColor;
+    Chart.defaults.scale.grid.color = gridColor;
+
+    // Render Today's Main Chart
+    const todayCanvas = document.getElementById('today-chart');
+    if (todayCanvas) {
+        const todaySeries = JSON.parse(todayCanvas.getAttribute('data-series'));
+        const labels = Array.from({length: todaySeries.length}, (_, i) => i);
+        
+        new Chart(todayCanvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Selected Day's Normalized Shape",
+                    data: todaySeries,
+                    borderColor: '#28a745',
+                    borderWidth: 3,
+                    tension: 0.2,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    fill: true,
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true } },
+                scales: {
+                    x: { display: false },
+                    y: { min: 0, max: 100 }
+                }
+            }
+        });
+    }
+
+    // Render comparison match charts
+    const matchCanvases = document.querySelectorAll('canvas[id^="chart-"]');
+    matchCanvases.forEach(canvas => {
+        const histSeries = JSON.parse(canvas.getAttribute('data-historical'));
+        const todaySeries = JSON.parse(canvas.getAttribute('data-today'));
+        const labels = Array.from({length: histSeries.length}, (_, i) => i);
+        
+        new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Hist. Pattern',
+                        data: histSeries,
+                        borderColor: '#007bff',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        pointRadius: 0,
+                        fill: false
+                    },
+                    {
+                        label: 'Today Curve',
+                        data: todaySeries,
+                        borderColor: 'rgba(40, 167, 69, 0.5)',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.2,
+                        pointRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                },
+                scales: {
+                    x: { display: false },
+                    y: { min: 0, max: 100, ticks: { display: false } }
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
