@@ -797,165 +797,7 @@ def index_analysis():
             for key in ['open', 'high', 'low', 'close', 'ma_20', 'ma_200', 'atr', 'adx']:
                 if row.get(key) is not None:
                     row[key] = round(float(row[key]), 2)
-                    
-    return render_template('admin/index_chart.html', 
-                         chart_data=chart_data,
-                         symbol=symbol,
-                         adx_status=adx_status,
-                         adx_value=adx_value,
-                         latest_spot=latest_spot)
-
-@admin_bp.route('/index-patterns')
-@login_required
-@admin_required
-def index_patterns():
-    """Visualize the most frequent chart patterns formed"""
-    symbol = request.args.get('symbol', 'NIFTY')
-    pattern_type = request.args.get('pattern_type', '')
     
-    query = NiftyPattern.query
-    if symbol:
-        query = query.filter(NiftyPattern.symbol == symbol)
-    if pattern_type:
-        query = query.filter(NiftyPattern.pattern_type == pattern_type)
-        
-    # Get distinct pattern types for filter
-    types_query = db.session.query(NiftyPattern.pattern_type).filter(NiftyPattern.symbol == symbol).distinct().all()
-    types = [t[0] for t in types_query if t[0]]
-    
-    # Get top 12 patterns by similar_count
-    patterns = query.order_by(NiftyPattern.similar_count.desc()).limit(12).all()
-    
-    return render_template(
-        'admin/index_patterns.html',
-        patterns=patterns,
-        symbols=['NIFTY', 'BANKNIFTY'],
-        types=types,
-        filters={'symbol': symbol, 'pattern_type': pattern_type}
-    )
-
-@admin_bp.route('/live-pattern-match')
-@login_required
-@admin_required
-def live_pattern_match():
-    """Visualize how today's shape matches historical patterns"""
-    symbol = request.args.get('symbol', 'NIFTY')
-    
-    # Date and Time handling
-    date_str = request.args.get('date', '')
-    try:
-        query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        query_date = datetime.now().date()
-        date_str = query_date.strftime('%Y-%m-%d')
-        
-    start_time_str = request.args.get('start_time', '09:15')
-    end_time_str = request.args.get('end_time', '15:30')
-    
-    try:
-        ts_start = datetime.combine(query_date, datetime.strptime(start_time_str, '%H:%M').time())
-        ts_end = datetime.combine(query_date, datetime.strptime(end_time_str, '%H:%M').time())
-    except ValueError:
-        ts_start = datetime.combine(query_date, time(9, 15))
-        ts_end = datetime.combine(query_date, time(15, 30))
-        start_time_str = '09:15'
-        end_time_str = '15:30'
-        
-    threshold = request.args.get('threshold', 80.0, type=float)
-    
-    # Load engine visually from scripts without strict import errors locally
-    import importlib.util
-    import os
-    engine_path = os.path.join(current_app.root_path, '..', 'scripts', 'nifty_chart_pattern_engine.py')
-    
-    spec = importlib.util.spec_from_file_location("nifty_engine", engine_path)
-    if not spec:
-         flash("Could not locate scripts/nifty_chart_pattern_engine.py", "danger")
-         return redirect(url_for('admin.dashboard'))
-         
-    engine = importlib.util.module_from_spec(spec)
-    try:
-        spec.loader.exec_module(engine)
-    except Exception as e:
-        flash(f"Error loading Pattern Engine module: {e}. Check server logs.", "danger")
-        return redirect(url_for('admin.dashboard'))
-        
-    # Fetch data
-    index_data = IndexData.query.filter(
-        IndexData.symbol == symbol,
-        IndexData.timestamp >= ts_start,
-        IndexData.timestamp <= ts_end
-    ).order_by(IndexData.timestamp).all()
-    
-    if len(index_data) < 10:
-        if request.args:
-            flash(f"Not enough candles ({len(index_data)}) for {symbol} on {date_str} between {start_time_str} and {end_time_str}.", "warning")
-        return render_template('admin/live_pattern_match.html', 
-                               today_curve=[], matches=[], today_stats={},
-                               symbols=['NIFTY', 'BANKNIFTY'],
-                               filters={'symbol': symbol, 'date': date_str, 'start_time': start_time_str, 'end_time': end_time_str, 'threshold': threshold})
-                               
-    # Transform to df
-    import pandas as pd
-    import numpy as np
-    df = pd.DataFrame([{
-        'timestamp': d.timestamp,
-        'open': d.open or 0.0,
-        'high': d.high or 0.0,
-        'low': d.low or 0.0,
-        'close': d.close or 0.0,
-        'adx': d.adx,
-        'supertrend_direction': d.supertrend_direction,
-        'super_power': d.super_power
-    } for d in index_data])
-    
-    # Run engine logic
-    curve = engine.build_curve(df)
-    features = engine.compute_features(df)
-    ptype = engine.classify_pattern(df, curve)
-    complexity = engine.curve_complexity(curve)
-    
-    # Load all patterns from DB matching symbol and ptype
-    all_patterns = NiftyPattern.query.filter_by(symbol=symbol, pattern_type=ptype).all()
-    
-    results = []
-    for p in all_patterns:
-        pat_series = np.array(p.normalized_series)
-        sim = engine.dtw_similarity(curve, pat_series)
-        if sim >= threshold:
-            results.append({
-                'pattern': p,
-                'similarity': round(sim, 2)
-            })
-            
-    # Sort by similarity descending
-    results.sort(key=lambda x: x['similarity'], reverse=True)
-    
-    # Top matches
-    top_matches = results[:12]
-    
-    today_stats = {
-        'pattern_type': ptype,
-        'complexity': round(complexity, 2),
-        'deviation_pct': features['deviation_pct'],
-        'open_close_chg_pct': features['open_close_chg_pct'],
-        'candles': len(df)
-    }
-    
-    return render_template('admin/live_pattern_match.html',
-                           today_curve=curve.tolist(),
-                           today_stats=today_stats,
-                           matches=top_matches,
-                           symbols=['NIFTY', 'BANKNIFTY'],
-                           filters={
-                               'symbol': symbol, 
-                               'date': date_str, 
-                               'start_time': start_time_str, 
-                               'end_time': end_time_str, 
-                               'threshold': threshold
-                           })
-
-
     # --- OI Analysis Logic ---
     # 1. Get Current Total OI Change for today (Assuming today's expiry or next expiry? Usually 'Current Expiry')
     # We need to find the active expiry for the symbol.
@@ -1551,3 +1393,157 @@ def oi_chart_data():
         tb_str  = _tb.format_exc()
         current_app.logger.error(f"[OI-CHART] EXCEPTION: {err_msg}\n{tb_str}")
         return jsonify({'error': err_msg, 'traceback': tb_str}), 500
+
+
+@admin_bp.route('/index-patterns')
+@login_required
+@admin_required
+def index_patterns():
+    """Visualize the most frequent chart patterns formed"""
+    symbol = request.args.get('symbol', 'NIFTY')
+    pattern_type = request.args.get('pattern_type', '')
+    
+    query = NiftyPattern.query
+    if symbol:
+        query = query.filter(NiftyPattern.symbol == symbol)
+    if pattern_type:
+        query = query.filter(NiftyPattern.pattern_type == pattern_type)
+        
+    # Get distinct pattern types for filter
+    types_query = db.session.query(NiftyPattern.pattern_type).filter(NiftyPattern.symbol == symbol).distinct().all()
+    types = [t[0] for t in types_query if t[0]]
+    
+    # Get top 12 patterns by similar_count
+    patterns = query.order_by(NiftyPattern.similar_count.desc()).limit(12).all()
+    
+    return render_template(
+        'admin/index_patterns.html',
+        patterns=patterns,
+        symbols=['NIFTY', 'BANKNIFTY'],
+        types=types,
+        filters={'symbol': symbol, 'pattern_type': pattern_type}
+    )
+
+@admin_bp.route('/live-pattern-match')
+@login_required
+@admin_required
+def live_pattern_match():
+    """Visualize how today's shape matches historical patterns"""
+    symbol = request.args.get('symbol', 'NIFTY')
+    
+    # Date and Time handling
+    date_str = request.args.get('date', '')
+    try:
+        from datetime import time
+        query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        query_date = datetime.now().date()
+        date_str = query_date.strftime('%Y-%m-%d')
+        
+    start_time_str = request.args.get('start_time', '09:15')
+    end_time_str = request.args.get('end_time', '15:30')
+    
+    try:
+        from datetime import time
+        ts_start = datetime.combine(query_date, datetime.strptime(start_time_str, '%H:%M').time())
+        ts_end = datetime.combine(query_date, datetime.strptime(end_time_str, '%H:%M').time())
+    except ValueError:
+        from datetime import time
+        ts_start = datetime.combine(query_date, time(9, 15))
+        ts_end = datetime.combine(query_date, time(15, 30))
+        start_time_str = '09:15'
+        end_time_str = '15:30'
+        
+    threshold = request.args.get('threshold', 80.0, type=float)
+    
+    # Load engine visually from scripts without strict import errors locally
+    import importlib.util
+    import os
+    engine_path = os.path.join(current_app.root_path, '..', 'scripts', 'nifty_chart_pattern_engine.py')
+    
+    spec = importlib.util.spec_from_file_location("nifty_engine", engine_path)
+    if not spec:
+         flash("Could not locate scripts/nifty_chart_pattern_engine.py", "danger")
+         return redirect(url_for('admin.dashboard'))
+         
+    engine = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(engine)
+    except Exception as e:
+        flash(f"Error loading Pattern Engine module: {e}. Check server logs.", "danger")
+        return redirect(url_for('admin.dashboard'))
+        
+    # Fetch data
+    index_data = IndexData.query.filter(
+        IndexData.symbol == symbol,
+        IndexData.timestamp >= ts_start,
+        IndexData.timestamp <= ts_end
+    ).order_by(IndexData.timestamp).all()
+    
+    if len(index_data) < 10:
+        if request.args:
+            flash(f"Not enough candles ({len(index_data)}) for {symbol} on {date_str} between {start_time_str} and {end_time_str}.", "warning")
+        return render_template('admin/live_pattern_match.html', 
+                               today_curve=[], matches=[], today_stats={},
+                               symbols=['NIFTY', 'BANKNIFTY'],
+                               filters={'symbol': symbol, 'date': date_str, 'start_time': start_time_str, 'end_time': end_time_str, 'threshold': threshold})
+                               
+    # Transform to df
+    import pandas as pd
+    import numpy as np
+    df = pd.DataFrame([{
+        'timestamp': d.timestamp,
+        'open': d.open or 0.0,
+        'high': d.high or 0.0,
+        'low': d.low or 0.0,
+        'close': d.close or 0.0,
+        'adx': d.adx,
+        'supertrend_direction': d.supertrend_direction,
+        'super_power': d.super_power
+    } for d in index_data])
+    
+    # Run engine logic
+    curve = engine.build_curve(df)
+    features = engine.compute_features(df)
+    ptype = engine.classify_pattern(df, curve)
+    complexity = engine.curve_complexity(curve)
+    
+    # Load all patterns from DB matching symbol and ptype
+    all_patterns = NiftyPattern.query.filter_by(symbol=symbol, pattern_type=ptype).all()
+    
+    results = []
+    for p in all_patterns:
+        pat_series = np.array(p.normalized_series)
+        sim = engine.dtw_similarity(curve, pat_series)
+        if sim >= threshold:
+            results.append({
+                'pattern': p,
+                'similarity': round(sim, 2)
+            })
+            
+    # Sort by similarity descending
+    results.sort(key=lambda x: x['similarity'], reverse=True)
+    
+    # Top matches
+    top_matches = results[:12]
+    
+    today_stats = {
+        'pattern_type': ptype,
+        'complexity': round(complexity, 2),
+        'deviation_pct': features['deviation_pct'],
+        'open_close_chg_pct': features['open_close_chg_pct'],
+        'candles': len(df)
+    }
+    
+    return render_template('admin/live_pattern_match.html',
+                           today_curve=curve.tolist(),
+                           today_stats=today_stats,
+                           matches=top_matches,
+                           symbols=['NIFTY', 'BANKNIFTY'],
+                           filters={
+                               'symbol': symbol, 
+                               'date': date_str, 
+                               'start_time': start_time_str, 
+                               'end_time': end_time_str, 
+                               'threshold': threshold
+                           })
