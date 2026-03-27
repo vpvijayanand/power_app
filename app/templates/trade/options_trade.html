@@ -1,0 +1,897 @@
+{% extends 'base.html' %}
+
+{% block title %}Options Trade — AlgoTrade{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============================================================
+   OPTIONS TRADE – DARK PREMIUM LAYOUT
+============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+:root {
+  --bg-base:       #0b0e1a;
+  --bg-card:       #131826;
+  --bg-elevated:   #1a2035;
+  --border:        rgba(255,255,255,.07);
+  --text-primary:  #e8ecf4;
+  --text-muted:    #7a8599;
+  --green:         #00d4a0;
+  --green-dim:     rgba(0,212,160,.12);
+  --red:           #ff4c6a;
+  --red-dim:       rgba(255,76,106,.12);
+  --blue:          #4d91ff;
+  --blue-dim:      rgba(77,145,255,.12);
+  --gold:          #f5c842;
+  --ce-accent:     #4d91ff;
+  --pe-accent:     #ff6b35;
+  --radius:        12px;
+  --shadow:        0 4px 24px rgba(0,0,0,.45);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg-base); font-family: 'Inter', sans-serif; color: var(--text-primary); }
+
+.ot-page { padding: 16px 20px 40px; max-width: 1800px; margin: 0 auto; }
+
+/* ── Page header ── */
+.ot-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 18px; gap: 12px; flex-wrap: wrap;
+}
+.ot-header h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -.3px; }
+.ot-header h1 span { color: var(--blue); }
+.spot-badge {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 18px;
+  font-family: 'JetBrains Mono', monospace; font-size: 1.05rem; font-weight: 600;
+  color: var(--gold);
+}
+.spot-badge small { font-size: .72rem; color: var(--text-muted); display: block; text-align: center; }
+
+/* ── Expiry row ── */
+.ot-expiry-row {
+  display: flex; gap: 10px; align-items: center; margin-bottom: 18px; flex-wrap: wrap;
+}
+.ot-select {
+  background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-primary);
+  border-radius: 8px; padding: 8px 14px; font-size: .9rem; font-family: 'Inter', sans-serif;
+  cursor: pointer; outline: none;
+}
+.ot-select:focus { border-color: var(--blue); }
+.ot-label { font-size: .82rem; color: var(--text-muted); font-weight: 500; }
+
+/* ── Two‑column CE / PE layout ── */
+.ot-panels {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;
+}
+@media (max-width: 1100px) { .ot-panels { grid-template-columns: 1fr; } }
+
+/* ── Option panel card ── */
+.opt-panel {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow); display: flex; flex-direction: column;
+}
+.opt-panel-header {
+  padding: 14px 18px 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+}
+.opt-panel-title {
+  font-size: 1rem; font-weight: 700; letter-spacing: .5px;
+  display: flex; align-items: center; gap: 8px;
+}
+.ce-badge { background: var(--blue-dim); color: var(--ce-accent); padding: 2px 10px; border-radius: 20px; font-size: .8rem; font-weight: 600; }
+.pe-badge { background: rgba(255,107,53,.14); color: var(--pe-accent); padding: 2px 10px; border-radius: 20px; font-size: .8rem; font-weight: 600; }
+
+/* ── Strike selector inside panel ── */
+.strike-row { padding: 12px 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.strike-select-wrap { position: relative; }
+.strike-select-wrap select { min-width: 160px; }
+.strike-hint { font-size: .78rem; color: var(--text-muted); }
+
+/* ── LTP Display ── */
+.ltp-display {
+  padding: 12px 18px 8px;
+  display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border);
+}
+.ltp-value {
+  font-family: 'JetBrains Mono', monospace; font-size: 2rem; font-weight: 700;
+  transition: color .3s;
+}
+.ltp-change { font-size: .88rem; font-weight: 600; }
+.ltp-up { color: var(--green); }
+.ltp-down { color: var(--red); }
+.ltp-neutral { color: var(--text-muted); }
+
+/* ── Stats bar ── */
+.stats-bar {
+  padding: 8px 18px; display: flex; gap: 20px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); background: var(--bg-base);
+}
+.stat-item { display: flex; flex-direction: column; }
+.stat-item .s-label { font-size: .7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+.stat-item .s-value { font-size: .88rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+/* ── Chart ── */
+.chart-wrap { padding: 10px 14px; flex: 1; min-height: 200px; position: relative; }
+.chart-wrap canvas { width: 100% !important; }
+
+/* ── Trade controls ── */
+.trade-controls {
+  padding: 14px 18px; display: flex; gap: 10px; align-items: center;
+  border-top: 1px solid var(--border); flex-wrap: wrap;
+}
+.lot-input {
+  width: 80px; background: var(--bg-elevated); border: 1px solid var(--border);
+  color: var(--text-primary); border-radius: 8px; padding: 8px 12px;
+  font-size: .95rem; font-family: 'JetBrains Mono', monospace; text-align: center; outline: none;
+}
+.lot-input:focus { border-color: var(--green); }
+.lot-label { font-size: .8rem; color: var(--text-muted); }
+
+.btn-buy {
+  background: linear-gradient(135deg, #00d4a0, #00a87e); color: #0b1a14;
+  border: none; border-radius: 8px; padding: 10px 26px; font-size: .95rem;
+  font-weight: 700; cursor: pointer; letter-spacing: .3px;
+  transition: opacity .2s, transform .1s, box-shadow .2s;
+  box-shadow: 0 0 0 0 rgba(0,212,160,.5);
+}
+.btn-buy:hover { opacity: .92; transform: translateY(-1px); }
+.btn-buy:active { transform: translateY(0); }
+.btn-buy.active-trade {
+  animation: pulseBuy 1.5s infinite;
+}
+@keyframes pulseBuy {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,212,160,.6); }
+  50%      { box-shadow: 0 0 0 10px rgba(0,212,160,0); }
+}
+
+.btn-sell {
+  background: linear-gradient(135deg, #ff4c6a, #cc2244); color: #fff;
+  border: none; border-radius: 8px; padding: 10px 26px; font-size: .95rem;
+  font-weight: 700; cursor: pointer; letter-spacing: .3px;
+  transition: opacity .2s, transform .1s, box-shadow .2s;
+}
+.btn-sell:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+.btn-sell:disabled { opacity: .35; cursor: not-allowed; }
+
+.trade-status-txt { font-size: .82rem; color: var(--text-muted); flex: 1; min-width: 100px; }
+
+/* ── Full-width section cards ── */
+.ot-section {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 16px; overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.ot-section-header {
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ot-section-title { font-size: .95rem; font-weight: 700; }
+.section-tag {
+  font-size: .72rem; padding: 2px 10px; border-radius: 20px; font-weight: 600;
+}
+.tag-live { background: rgba(255,76,106,.15); color: var(--red); }
+.tag-blue { background: var(--blue-dim); color: var(--blue); }
+.tag-green { background: var(--green-dim); color: var(--green); }
+.section-last-update { font-size: .75rem; color: var(--text-muted); }
+
+/* ── PNL Section ── */
+.pnl-top {
+  padding: 12px 18px; display: flex; gap: 20px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+}
+.pnl-summary-box {
+  background: var(--bg-elevated); border-radius: 8px; padding: 10px 20px;
+  text-align: center; min-width: 130px;
+}
+.pnl-summary-box .pb-label { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; }
+.pnl-summary-box .pb-value { font-size: 1.3rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.pnl-chart-wrap { padding: 10px 14px; height: 180px; }
+
+.pnl-user-grid {
+  padding: 10px 18px 14px; display: flex; flex-wrap: wrap; gap: 10px;
+}
+.pnl-user-card {
+  background: var(--bg-elevated); border-radius: 8px; padding: 8px 16px;
+  min-width: 160px; display: flex; flex-direction: column; gap: 2px;
+  border-left: 3px solid var(--border);
+}
+.pnl-user-card.gain { border-left-color: var(--green); }
+.pnl-user-card.loss { border-left-color: var(--red); }
+.puc-name { font-size: .78rem; color: var(--text-muted); font-weight: 500; }
+.puc-pnl  { font-size: 1rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.puc-pts  { font-size: .78rem; }
+.puc-sym  { font-size: .72rem; color: var(--text-muted); }
+
+/* ── Kite Orders Table ── */
+.ot-table-wrap { overflow-x: auto; }
+.ot-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.ot-table th {
+  padding: 9px 14px; text-align: left; color: var(--text-muted); font-weight: 600;
+  font-size: .75rem; text-transform: uppercase; letter-spacing: .4px;
+  background: var(--bg-base); border-bottom: 1px solid var(--border);
+}
+.ot-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+.ot-table tr:last-child td { border-bottom: none; }
+.ot-table tr:hover td { background: var(--bg-elevated); }
+
+.status-complete { color: var(--green); font-weight: 600; }
+.status-open     { color: var(--gold); font-weight: 600; }
+.status-rejected { color: var(--red); font-weight: 600; }
+.type-buy  { color: var(--green); font-weight: 600; }
+.type-sell { color: var(--red); font-weight: 600; }
+
+/* ── Today Trades Table ── */
+.pts-pos { color: var(--green); font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.pts-neg { color: var(--red);   font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.pts-zero { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+/* ── Toast notifications ── */
+#ot-toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.toast-msg {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 18px; font-size: .88rem;
+  box-shadow: var(--shadow); animation: slideIn .25s ease;
+  max-width: 360px; pointer-events: all;
+}
+.toast-msg.toast-ok   { border-left: 4px solid var(--green); }
+.toast-msg.toast-err  { border-left: 4px solid var(--red); }
+.toast-msg.toast-info { border-left: 4px solid var(--blue); }
+@keyframes slideIn { from { transform: translateX(60px); opacity: 0; } }
+
+/* ── Loading spinner ── */
+.spin {
+  display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin .7s linear infinite; vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ot-page">
+
+  <!-- ══ Page Header ══ -->
+  <div class="ot-header">
+    <h1>⚡ Options <span>Trade</span></h1>
+    <div class="spot-badge">
+      <small>NIFTY SPOT</small>
+      <span id="spot-price">{{ spot or '—' }}</span>
+    </div>
+  </div>
+
+  <!-- ══ Expiry Selector (global, shared by both panels) ══ -->
+  <div class="ot-expiry-row">
+    <span class="ot-label">EXPIRY</span>
+    <select class="ot-select" id="global-expiry" onchange="onExpiryChange()">
+      {% for exp in expiries %}
+      <option value="{{ exp }}" {% if exp|string == expiry %}selected{% endif %}>{{ exp }}</option>
+      {% endfor %}
+    </select>
+    <span class="ot-label" id="expiry-label" style="color:#f5c842; font-weight:600;"></span>
+  </div>
+
+  <!-- ══ CE / PE Panels ══ -->
+  <div class="ot-panels">
+
+    <!-- ──── CE PANEL ──── -->
+    <div class="opt-panel" id="ce-panel">
+      <div class="opt-panel-header">
+        <div class="opt-panel-title">
+          <span>CALL</span>
+          <span class="ce-badge">CE</span>
+        </div>
+        <div style="font-size:.8rem; color:var(--text-muted);" id="ce-open-info">
+          {% if has_open_ce %}<span style="color:var(--green);">● Active Trade</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="strike-row">
+        <span class="ot-label">STRIKE</span>
+        <div class="strike-select-wrap">
+          <select class="ot-select" id="ce-strike" onchange="onStrikeChange('CE')">
+            {% for s in strikes %}
+            <option value="{{ s }}" {% if s == itm_ce %}selected{% endif %}>{{ s|int }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <span class="strike-hint" id="ce-strike-symbol">—</span>
+      </div>
+
+      <div class="ltp-display">
+        <span class="ltp-value" id="ce-ltp">0.00</span>
+        <span class="ltp-change ltp-neutral" id="ce-chg">0.00 (0.00%)</span>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-item"><span class="s-label">OI</span><span class="s-value" id="ce-oi">—</span></div>
+        <div class="stat-item"><span class="s-label">OI Chg</span><span class="s-value" id="ce-oi-chg">—</span></div>
+        <div class="stat-item"><span class="s-label">Volume</span><span class="s-value" id="ce-vol">—</span></div>
+        <div class="stat-item"><span class="s-label">IV</span><span class="s-value" id="ce-iv">—</span></div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="ce-chart" height="180"></canvas>
+      </div>
+
+      <div class="trade-controls">
+        <div>
+          <div class="lot-label">Lots</div>
+          <input type="number" class="lot-input" id="ce-lots" value="1" min="1" max="100">
+        </div>
+        <button class="btn-buy {% if has_open_ce %}active-trade{% endif %}" id="ce-buy-btn" onclick="doBuy('CE')">
+          BUY CE
+        </button>
+        <button class="btn-sell" id="ce-sell-btn" onclick="doSell('CE')"
+          {% if not has_open_ce %}disabled{% endif %}>
+          EXIT CE
+        </button>
+        <span class="trade-status-txt" id="ce-status">
+          {% if has_open_ce %}Trade OPEN — click EXIT to close{% else %}Ready to trade{% endif %}
+        </span>
+      </div>
+    </div>
+
+    <!-- ──── PE PANEL ──── -->
+    <div class="opt-panel" id="pe-panel">
+      <div class="opt-panel-header">
+        <div class="opt-panel-title">
+          <span>PUT</span>
+          <span class="pe-badge">PE</span>
+        </div>
+        <div style="font-size:.8rem; color:var(--text-muted);" id="pe-open-info">
+          {% if has_open_pe %}<span style="color:var(--green);">● Active Trade</span>{% endif %}
+        </div>
+      </div>
+
+      <div class="strike-row">
+        <span class="ot-label">STRIKE</span>
+        <div class="strike-select-wrap">
+          <select class="ot-select" id="pe-strike" onchange="onStrikeChange('PE')">
+            {% for s in strikes %}
+            <option value="{{ s }}" {% if s == itm_pe %}selected{% endif %}>{{ s|int }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <span class="strike-hint" id="pe-strike-symbol">—</span>
+      </div>
+
+      <div class="ltp-display">
+        <span class="ltp-value" id="pe-ltp">0.00</span>
+        <span class="ltp-change ltp-neutral" id="pe-chg">0.00 (0.00%)</span>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-item"><span class="s-label">OI</span><span class="s-value" id="pe-oi">—</span></div>
+        <div class="stat-item"><span class="s-label">OI Chg</span><span class="s-value" id="pe-oi-chg">—</span></div>
+        <div class="stat-item"><span class="s-label">Volume</span><span class="s-value" id="pe-vol">—</span></div>
+        <div class="stat-item"><span class="s-label">IV</span><span class="s-value" id="pe-iv">—</span></div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="pe-chart" height="180"></canvas>
+      </div>
+
+      <div class="trade-controls">
+        <div>
+          <div class="lot-label">Lots</div>
+          <input type="number" class="lot-input" id="pe-lots" value="1" min="1" max="100">
+        </div>
+        <button class="btn-buy {% if has_open_pe %}active-trade{% endif %}" id="pe-buy-btn" onclick="doBuy('PE')">
+          BUY PE
+        </button>
+        <button class="btn-sell" id="pe-sell-btn" onclick="doSell('PE')"
+          {% if not has_open_pe %}disabled{% endif %}>
+          EXIT PE
+        </button>
+        <span class="trade-status-txt" id="pe-status">
+          {% if has_open_pe %}Trade OPEN — click EXIT to close{% else %}Ready to trade{% endif %}
+        </span>
+      </div>
+    </div>
+  </div><!-- /.ot-panels -->
+
+
+  <!-- ══ Running PNL Section ══ -->
+  <div class="ot-section">
+    <div class="ot-section-header">
+      <span class="ot-section-title">📈 Running P&L</span>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="section-tag tag-live">LIVE</span>
+        <span class="section-last-update" id="pnl-ts">—</span>
+      </div>
+    </div>
+
+    <div class="pnl-top">
+      <div class="pnl-summary-box">
+        <div class="pb-label">Total PNL</div>
+        <div class="pb-value" id="total-pnl">₹0</div>
+      </div>
+      <div class="pnl-summary-box">
+        <div class="pb-label">CE PNL</div>
+        <div class="pb-value" id="ce-pnl-sum">₹0</div>
+      </div>
+      <div class="pnl-summary-box">
+        <div class="pb-label">PE PNL</div>
+        <div class="pb-value" id="pe-pnl-sum">₹0</div>
+      </div>
+    </div>
+
+    <div class="pnl-user-grid" id="pnl-user-grid">
+      <span style="color:var(--text-muted);font-size:.85rem;padding:4px;">No open trades</span>
+    </div>
+
+    <div class="pnl-chart-wrap">
+      <canvas id="pnl-chart"></canvas>
+    </div>
+  </div>
+
+
+  <!-- ══ Kite Orders (Client 2) ══ -->
+  <div class="ot-section">
+    <div class="ot-section-header">
+      <span class="ot-section-title">🏦 Kite Orders — <span id="kite-user-name" style="color:var(--blue);">Client 2</span></span>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="section-tag tag-blue">ACTUAL</span>
+        <span class="section-last-update" id="kite-last-update">—</span>
+      </div>
+    </div>
+    <div class="ot-table-wrap">
+      <table class="ot-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Symbol</th><th>Type</th><th>Product</th>
+            <th>Qty</th><th>Price</th><th>Status</th><th>Time</th>
+          </tr>
+        </thead>
+        <tbody id="kite-orders-body">
+          <tr><td colspan="8" style="color:var(--text-muted);text-align:center;padding:20px;">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- ══ Today's Trades Summary ══ -->
+  <div class="ot-section">
+    <div class="ot-section-header">
+      <span class="ot-section-title">📋 Today's Trades</span>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="section-tag tag-green" id="today-count">0 trades</span>
+        <span class="section-last-update" id="trades-last-update">—</span>
+      </div>
+    </div>
+    <div class="ot-table-wrap">
+      <table class="ot-table">
+        <thead>
+          <tr>
+            <th>User</th><th>Symbol</th><th>Type</th><th>Strike</th>
+            <th>Entry</th><th>Exit</th><th>Pts</th><th>PNL ₹</th>
+            <th>Qty</th><th>Mode</th><th>Entry T</th><th>Exit T</th>
+          </tr>
+        </thead>
+        <tbody id="today-trades-body">
+          <tr><td colspan="12" style="color:var(--text-muted);text-align:center;padding:20px;">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /.ot-page -->
+
+<!-- ── Toast Container ── -->
+<div id="ot-toast"></div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+/* ============================================================
+   STATE
+============================================================ */
+const UNDERLYING = '{{ underlying }}';
+let currentExpiry = '{{ expiry }}';
+
+let state = {
+  CE: { strike: {{ itm_ce or 0 }}, prevLtp: 0, hasOpen: {{ 'true' if has_open_ce else 'false' }} },
+  PE: { strike: {{ itm_pe or 0 }}, prevLtp: 0, hasOpen: {{ 'true' if has_open_pe else 'false' }} },
+};
+
+// PNL history for chart (keeps last 60 points)
+let pnlHistory = { labels: [], data: [] };
+
+/* ============================================================
+   CHART SETUP
+============================================================ */
+const chartDefaults = {
+  responsive: true, maintainAspectRatio: false,
+  animation: false,
+  plugins: { legend: { display: false }, tooltip: { enabled: true } },
+  scales: {
+    x: { ticks: { color: '#7a8599', font: { size: 10 }, maxTicksLimit: 8 },
+         grid: { color: 'rgba(255,255,255,.04)' } },
+    y: { ticks: { color: '#7a8599', font: { size: 10 } },
+         grid: { color: 'rgba(255,255,255,.06)' } }
+  }
+};
+
+function makeLineChart(canvasId, color) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  return new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [], borderColor: color, borderWidth: 2,
+        pointRadius: 0, fill: true,
+        backgroundColor: hexToRgba(color, .08),
+        tension: 0.3,
+      }]
+    },
+    options: { ...chartDefaults }
+  });
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+const ceChart  = makeLineChart('ce-chart',  '#4d91ff');
+const peChart  = makeLineChart('pe-chart',  '#ff6b35');
+const pnlChart = makeLineChart('pnl-chart', '#00d4a0');
+// Make PNL chart taller
+document.getElementById('pnl-chart').parentElement.style.height = '160px';
+
+/* ============================================================
+   EXPIRY / STRIKE CHANGE
+============================================================ */
+function onExpiryChange() {
+  currentExpiry = document.getElementById('global-expiry').value;
+  // Refetch strikes
+  fetch(`/trade/manual/strikes?underlying=${UNDERLYING}&expiry=${currentExpiry}`)
+    .then(r => r.json())
+    .then(d => {
+      populateStrikes('CE', d.strikes, d.itm_ce);
+      populateStrikes('PE', d.strikes, d.itm_pe);
+    }).catch(() => {});
+}
+
+function populateStrikes(type, strikes, itm) {
+  const sel = document.getElementById(`${type.toLowerCase()}-strike`);
+  sel.innerHTML = '';
+  strikes.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = parseInt(s);
+    if (s === itm) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  state[type].strike = parseFloat(sel.value);
+  fetchLtp(type);
+}
+
+function onStrikeChange(type) {
+  const sel = document.getElementById(`${type.toLowerCase()}-strike`);
+  state[type].strike = parseFloat(sel.value);
+  // Reset chart
+  const chart = type === 'CE' ? ceChart : peChart;
+  chart.data.labels = [];
+  chart.data.datasets[0].data = [];
+  chart.update();
+  fetchLtp(type);
+}
+
+/* ============================================================
+   LTP FETCH & CHART UPDATE
+============================================================ */
+function fetchLtp(type) {
+  const strike = state[type].strike;
+  if (!strike || !currentExpiry) return;
+  const url = `/trade/options/ltp?underlying=${UNDERLYING}&expiry=${currentExpiry}&strike=${strike}&option_type=${type}&limit=60`;
+  fetch(url)
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) return;
+      const chart = type === 'CE' ? ceChart : peChart;
+      if (d.history && d.history.length) {
+        chart.data.labels = d.history.map(p => p.t);
+        chart.data.datasets[0].data = d.history.map(p => p.v);
+        chart.update();
+      }
+      if (d.stats) updateStats(type, d.stats);
+    }).catch(() => {});
+}
+
+function updateStats(type, stats) {
+  const t = type.toLowerCase();
+  const ltpEl  = document.getElementById(`${t}-ltp`);
+  const chgEl  = document.getElementById(`${t}-chg`);
+  const ltp = stats.ltp || 0;
+  const prev = state[type].prevLtp;
+
+  ltpEl.textContent = ltp.toFixed(2);
+  ltpEl.className = 'ltp-value ' + (ltp > prev ? 'ltp-up' : ltp < prev ? 'ltp-down' : 'ltp-neutral');
+
+  const chgPct = stats.change_pct || 0;
+  const chgAbs = ltp - (ltp / (1 + chgPct/100));
+  chgEl.textContent = `${chgAbs >= 0?'+':''}${chgAbs.toFixed(2)} (${chgPct >= 0?'+':''}${chgPct.toFixed(2)}%)`;
+  chgEl.className = 'ltp-change ' + (chgPct >= 0 ? 'ltp-up' : 'ltp-down');
+
+  state[type].prevLtp = ltp;
+
+  document.getElementById(`${t}-oi`).textContent     = fmtNum(stats.oi);
+  document.getElementById(`${t}-oi-chg`).textContent = fmtNum(stats.oi_change);
+  document.getElementById(`${t}-vol`).textContent    = fmtNum(stats.volume);
+  document.getElementById(`${t}-iv`).textContent     = stats.iv ? stats.iv.toFixed(2) + '%' : '—';
+
+  if (stats.spot) document.getElementById('spot-price').textContent = stats.spot.toFixed(2);
+}
+
+/* ============================================================
+   BUY
+============================================================ */
+function doBuy(type) {
+  if (state[type].hasOpen) { showToast('Already have an open ' + type + ' trade. Exit first.', 'err'); return; }
+  const strike = state[type].strike;
+  const lots   = parseInt(document.getElementById(`${type.toLowerCase()}-lots`).value) || 1;
+  const btn    = document.getElementById(`${type.toLowerCase()}-buy-btn`);
+
+  if (!strike || !currentExpiry) { showToast('Select a strike first', 'err'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> Placing…';
+
+  fetch('/trade/options/buy', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ underlying: UNDERLYING, expiry: currentExpiry, strike, option_type: type, lots })
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.disabled = false;
+    if (d.error) {
+      showToast(d.error, 'err');
+      btn.innerHTML = `BUY ${type}`;
+      return;
+    }
+    const msg = `✅ BUY ${type} ${strike} — ${d.live_orders} live, ${d.paper_orders} paper`;
+    showToast(msg, 'ok');
+    state[type].hasOpen = true;
+    btn.innerHTML = `BUY ${type}`;
+    btn.classList.add('active-trade');
+    setSellEnabled(type, true);
+    setStatusText(type, `OPEN @ LTP — waiting for exit`);
+    setOpenInfo(type, true);
+  })
+  .catch(e => {
+    btn.disabled = false; btn.innerHTML = `BUY ${type}`;
+    showToast('Network error: ' + e.message, 'err');
+  });
+}
+
+/* ============================================================
+   SELL (EXIT)
+============================================================ */
+function doSell(type) {
+  if (!state[type].hasOpen) { showToast('No open ' + type + ' trade', 'err'); return; }
+  const strike = state[type].strike;
+  const btn    = document.getElementById(`${type.toLowerCase()}-sell-btn`);
+
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Exiting…';
+
+  fetch('/trade/options/sell', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ strike, option_type: type, expiry: currentExpiry })
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.innerHTML = `EXIT ${type}`;
+    if (d.error) { showToast(d.error, 'err'); btn.disabled = false; return; }
+    const summary = d.trades.map(t =>
+      `${t.user}: ${t.points >= 0 ? '+' : ''}${t.points} pts (₹${t.pnl >= 0 ? '+' : ''}${t.pnl})`
+    ).join(' | ');
+    showToast(`✅ EXIT ${type} done — ${summary}`, 'ok');
+    state[type].hasOpen = false;
+    btn.disabled = true;
+    document.getElementById(`${type.toLowerCase()}-buy-btn`).classList.remove('active-trade');
+    setStatusText(type, 'Trade closed. Ready for next.');
+    setOpenInfo(type, false);
+    fetchTradesToday();
+  })
+  .catch(e => {
+    btn.disabled = false; btn.innerHTML = `EXIT ${type}`;
+    showToast('Network error: ' + e.message, 'err');
+  });
+}
+
+/* ============================================================
+   PNL POLL
+============================================================ */
+function fetchPnl() {
+  fetch('/trade/options/pnl')
+    .then(r => r.json())
+    .then(d => {
+      const now = d.timestamp || '--:--:--';
+      document.getElementById('pnl-ts').textContent = 'as of ' + now;
+
+      const tp = d.total_pnl || 0;
+      const tEl = document.getElementById('total-pnl');
+      tEl.textContent = (tp >= 0 ? '₹+' : '₹') + tp.toFixed(0);
+      tEl.style.color = tp >= 0 ? 'var(--green)' : 'var(--red)';
+
+      const cp = d.ce_pnl || 0;
+      const cpEl = document.getElementById('ce-pnl-sum');
+      cpEl.textContent = (cp >= 0 ? '₹+' : '₹') + cp.toFixed(0);
+      cpEl.style.color = cp >= 0 ? 'var(--green)' : 'var(--red)';
+
+      const pp = d.pe_pnl || 0;
+      const ppEl = document.getElementById('pe-pnl-sum');
+      ppEl.textContent = (pp >= 0 ? '₹+' : '₹') + pp.toFixed(0);
+      ppEl.style.color = pp >= 0 ? 'var(--green)' : 'var(--red)';
+
+      // User cards
+      const grid = document.getElementById('pnl-user-grid');
+      if (!d.trades || d.trades.length === 0) {
+        grid.innerHTML = '<span style="color:var(--text-muted);font-size:.85rem;padding:4px;">No open trades</span>';
+      } else {
+        grid.innerHTML = d.trades.map(t => {
+          const cls = t.pnl >= 0 ? 'gain' : 'loss';
+          const pStr = (t.pnl >= 0 ? '+' : '') + t.pnl.toFixed(2);
+          const ptStr = (t.points >= 0 ? '+' : '') + t.points.toFixed(2);
+          return `
+            <div class="pnl-user-card ${cls}">
+              <div class="puc-name">${t.user}</div>
+              <div class="puc-pnl" style="color:${t.pnl>=0?'var(--green)':'var(--red)'}">₹${pStr}</div>
+              <div class="puc-pts" style="color:${t.points>=0?'var(--green)':'var(--red)'}">Pts: ${ptStr}</div>
+              <div class="puc-sym">${t.symbol} ${t.option_type}</div>
+            </div>`;
+        }).join('');
+      }
+
+      // PNL chart rolling update
+      if (pnlHistory.labels.length > 59) {
+        pnlHistory.labels.shift(); pnlHistory.data.shift();
+      }
+      pnlHistory.labels.push(now);
+      pnlHistory.data.push(tp);
+      pnlChart.data.labels = [...pnlHistory.labels];
+      pnlChart.data.datasets[0].data = [...pnlHistory.data];
+      // Color based on value
+      pnlChart.data.datasets[0].borderColor = tp >= 0 ? '#00d4a0' : '#ff4c6a';
+      pnlChart.data.datasets[0].backgroundColor = tp >= 0 ? 'rgba(0,212,160,.08)' : 'rgba(255,76,106,.08)';
+      pnlChart.update();
+    }).catch(() => {});
+}
+
+/* ============================================================
+   KITE ORDERS POLL
+============================================================ */
+function fetchKiteOrders() {
+  fetch('/trade/options/kite-orders')
+    .then(r => r.json())
+    .then(d => {
+      if (d.user) document.getElementById('kite-user-name').textContent = d.user;
+      document.getElementById('kite-last-update').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN');
+      const tbody = document.getElementById('kite-orders-body');
+      if (!d.orders || d.orders.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-muted);text-align:center;padding:20px;">No orders found</td></tr>';
+        return;
+      }
+      tbody.innerHTML = d.orders.slice(0, 20).map((o, i) => {
+        const stCls = (o.status || '').toLowerCase().includes('complet') ? 'status-complete' :
+                      (o.status || '').toLowerCase().includes('open')    ? 'status-open' :
+                      (o.status || '').toLowerCase().includes('reject')  ? 'status-rejected' : '';
+        const tyCls = (o.type || '').toLowerCase() === 'buy' ? 'type-buy' : 'type-sell';
+        return `<tr>
+          <td>${i+1}</td>
+          <td style="font-family:'JetBrains Mono',monospace;font-size:.82rem;">${o.symbol || '—'}</td>
+          <td class="${tyCls}">${o.type || '—'}</td>
+          <td>${o.product || '—'}</td>
+          <td>${o.qty || 0}</td>
+          <td style="font-family:'JetBrains Mono',monospace;">₹${Number(o.price||0).toFixed(2)}</td>
+          <td class="${stCls}">${o.status || '—'}</td>
+          <td style="font-size:.78rem;color:var(--text-muted);">${fmtTime(o.time)}</td>
+        </tr>`;
+      }).join('');
+    }).catch(() => {});
+}
+
+/* ============================================================
+   TODAY'S TRADES POLL
+============================================================ */
+function fetchTradesToday() {
+  fetch('/trade/options/trades-today')
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('today-count').textContent = (d.count || 0) + ' trades';
+      document.getElementById('trades-last-update').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN');
+      const tbody = document.getElementById('today-trades-body');
+      if (!d.trades || d.trades.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="12" style="color:var(--text-muted);text-align:center;padding:20px;">No closed trades today</td></tr>';
+        return;
+      }
+      tbody.innerHTML = d.trades.map(t => {
+        const ptsCls = t.points > 0 ? 'pts-pos' : t.points < 0 ? 'pts-neg' : 'pts-zero';
+        const pnlCls = (t.pnl || 0) >= 0 ? 'pts-pos' : 'pts-neg';
+        return `<tr>
+          <td>${t.user}</td>
+          <td style="font-family:'JetBrains Mono',monospace;font-size:.8rem;">${t.symbol || '—'}</td>
+          <td>${t.option_type} <span style="color:var(--text-muted);font-size:.78rem;">@ ${t.strike||''}</span></td>
+          <td style="font-family:'JetBrains Mono',monospace;">${t.strike}</td>
+          <td style="font-family:'JetBrains Mono',monospace;">₹${Number(t.entry_price||0).toFixed(2)}</td>
+          <td style="font-family:'JetBrains Mono',monospace;">₹${Number(t.exit_price||0).toFixed(2)}</td>
+          <td class="${ptsCls}">${t.points >= 0 ? '+' : ''}${Number(t.points).toFixed(2)}</td>
+          <td class="${pnlCls}">₹${t.pnl >= 0 ? '+' : ''}${Number(t.pnl||0).toFixed(0)}</td>
+          <td>${t.qty}</td>
+          <td><span style="font-size:.75rem;padding:2px 8px;border-radius:20px;background:${t.mode==='Live'?'rgba(255,76,106,.15)':'rgba(77,145,255,.15)'};color:${t.mode==='Live'?'var(--red)':'var(--blue)'};">${t.mode}</span></td>
+          <td style="font-size:.78rem;color:var(--text-muted);">${t.entry_time}</td>
+          <td style="font-size:.78rem;color:var(--text-muted);">${t.exit_time}</td>
+        </tr>`;
+      }).join('');
+    }).catch(() => {});
+}
+
+/* ============================================================
+   HELPERS
+============================================================ */
+function setSellEnabled(type, v) {
+  document.getElementById(`${type.toLowerCase()}-sell-btn`).disabled = !v;
+}
+function setStatusText(type, txt) {
+  document.getElementById(`${type.toLowerCase()}-status`).textContent = txt;
+}
+function setOpenInfo(type, open) {
+  document.getElementById(`${type.toLowerCase()}-open-info`).innerHTML =
+    open ? '<span style="color:var(--green);">● Active Trade</span>' : '';
+}
+function fmtNum(n) {
+  if (!n && n !== 0) return '—';
+  return parseInt(n).toLocaleString('en-IN');
+}
+function fmtTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts.toString().slice(11,19) || ts.toString().slice(0,19);
+  return d.toLocaleTimeString('en-IN');
+}
+
+let _toastId = 0;
+function showToast(msg, type = 'info') {
+  const id = ++_toastId;
+  const el = document.createElement('div');
+  el.className = `toast-msg toast-${type}`;
+  el.textContent = msg;
+  el.id = 'toast-' + id;
+  document.getElementById('ot-toast').appendChild(el);
+  setTimeout(() => { const t = document.getElementById('toast-' + id); if (t) t.remove(); }, 5000);
+}
+
+/* ============================================================
+   INIT & POLLING
+============================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  // Initial fetches
+  fetchLtp('CE');
+  fetchLtp('PE');
+  fetchPnl();
+  fetchKiteOrders();
+  fetchTradesToday();
+
+  // Continuous polling
+  setInterval(() => { fetchLtp('CE'); fetchLtp('PE'); }, 5000);   // chart + stats: every 5s
+  setInterval(fetchPnl, 5000);                                      // PNL: every 5s
+  setInterval(fetchKiteOrders, 10000);                              // Kite orders: every 10s
+  setInterval(fetchTradesToday, 15000);                             // Trades: every 15s
+});
+</script>
+{% endblock %}
